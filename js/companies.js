@@ -174,11 +174,22 @@ function renderCompanyList() {
       return currentSort.asc ? valA - valB : valB - valA;
   });
 
+  const filteredTotal = filtered.length;
+
   const __q = String(activeFilters.name || "").trim();
   if (__q) {
     filtered = filtered.slice(0, 5000);
   } else {
     filtered = filtered.slice(0, clLimit);
+  }
+
+  // Şirket sayısı badge'i güncelle
+  const totalInGroup = (window.companies || []).filter(c => c.group === window.activeGroup).length;
+  const countEl = document.getElementById('cl-count');
+  if (countEl) {
+    countEl.textContent = filteredTotal < totalInGroup
+      ? `${filteredTotal.toLocaleString('tr-TR')} / ${totalInGroup.toLocaleString('tr-TR')} şirket`
+      : `${totalInGroup.toLocaleString('tr-TR')} şirket`;
   }
 
   window.__clRenderToken = (window.__clRenderToken || 0) + 1;
