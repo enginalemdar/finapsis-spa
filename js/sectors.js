@@ -133,8 +133,10 @@ window.secRenderTable = function(){
     const tree = {};
 
     companies.forEach(c => {
-        const secName = (c.sector && String(c.sector).trim()) ? c.sector : "Diğer";
-        const indName = (c.industry && String(c.industry).trim()) ? c.industry : "Diğer";
+        const rawSec = (c.sector && String(c.sector).trim());
+        const secName = (!rawSec || rawSec === '#N/A') ? "Diğer" : rawSec;
+        const rawInd = (c.industry && String(c.industry).trim());
+        const indName = (!rawInd || rawInd === '#N/A') ? "Diğer" : rawInd;
         const t = String(c.ticker).toUpperCase();
 
         if (!tree[secName]) tree[secName] = { name: secName, companies: [], industries: {} };
