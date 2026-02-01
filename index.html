@@ -31,7 +31,10 @@
 <div id="preloader"><div class="spinner"></div></div>
 
 <nav class="app-tabs">
-    <button class="tab-btn active" onclick="switchTab('screener.html')">Skorlama</button>
+    <button class="tab-btn active" data-tab="screener.html" onclick="switchTab('screener.html')">
+  <span class="tab-label">Skorlama</span>
+  <span class="tab-lock" aria-hidden="true">🔒</span>
+</button>
     <button class="tab-btn" onclick="switchTab('companieslist.html')">Şirketler</button>
     <button class="tab-btn" onclick="switchTab('sectors')">Sektörler</button>
     <button class="tab-btn" onclick="switchTab('diagrams')">Diyagramlar</button>
