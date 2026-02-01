@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0">
+  <title>Finapsis - Ultimate Suite</title>
+
+<meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0">
+  <title>Finapsis - Ultimate Suite</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="./app.css">
+
+  <!-- Bubble'dan gelecek session köprüsü (Bubble içinde set edeceğiz) -->
+  <script>
+    window.__SESSION__ = window.__SESSION__ || null;
+    // İstersen Bubble buraya FIN_DATA_BASE vs override koyabilir:
+    window.FIN_DATA_BASE = window.FIN_DATA_BASE || "https://finapsis-data.nameless-dream-696b.workers.dev";
+  </script>
+</head>
+<body>
+<div id="preloader"><div class="spinner"></div></div>
+
+<nav class="app-tabs">
+    <button class="tab-btn active" onclick="switchTab('screener.html')">Skorlama</button>
+    <button class="tab-btn" onclick="switchTab('companieslist.html')">Şirketler</button>
+    <button class="tab-btn" onclick="switchTab('sectors')">Sektörler</button>
+    <button class="tab-btn" onclick="switchTab('diagrams')">Diyagramlar</button>
+    <button class="tab-btn" onclick="switchTab('karsilastirma.html')">Karşılaştırma</button>
+    <button class="tab-btn" onclick="switchTab('portfolio.html')">Portföy</button>
+    <button class="tab-btn" onclick="switchTab('detail')">Varlık Detay</button>
+    <button class="tab-btn" onclick="switchTab('indicators')">Göstergeler</button>
+    <button class="tab-btn" onclick="switchTab('calendarlist')">Takvim</button>
+    <button class="tab-btn" onclick="switchTab('news')">Haberler</button>
+
+</nav>
+
+
+<div id="view-screener" class="view-section active">
+    <div class="finapsis-master">
+    
+        <div id="scActiveFiltersArea" class="sc-badge-area"></div>
+
+        <div class="main-grid">
+            <aside class="glass-panel">
+                <div class="panel-header">
+                    <div class="search-box">
+                        <i class="fa-solid fa-search text-[10px]"></i>
+                        <input type="text" id="metric-search" placeholder="METRİK ARA..." onkeyup="filterMetrics()">
+                    </div>
+                </div>
+                <div id="metrics-pool" class="metric-list custom-scroll"></div>
+            </aside>
+    
+            <main class="content-area">
+                <div class="drop-zone-container">
+                    <div style="font-size:10px; font-weight:700; color:var(--text-muted); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px; display:flex; justify-content:space-between;">
+                        <span>Aktif Filtreler</span>
+                        <span style="font-size:9px; opacity:0.5; font-weight:400;">Sürükle & Bırak</span>
+                    </div>
+                    <div id="active-criteria" class="drop-zone-target"></div>
+                </div>
+    
+                <div class="table-panel">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>ŞİRKET</th>
+                                    <th>SEKTÖR</th>
+                                    <th style="text-align:center;">SKOR</th>
+                                    <th style="text-align:right;">DETAYLAR (<span id="comp-label">SEKTÖR</span> / <span id="calc-label">MEDYAN</span>)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="screener-results-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+</div>
+
+<div id="view-companies" class="view-section">
+   <div class="top-controls">
+        <div class="cl-control-bar">
+            
+
+            <div id="clFilterBadges" class="cl-badge-area"></div>
+            <div class="cl-search-wrap">
+                <i class="fa-solid fa-magnifying-glass cl-search-icon"></i>
+                <input type="text" id="mainSearch" class="cl-search-input" placeholder="Şirket ara..." oninput="applyMainSearch(this)">
+            </div>
+        </div>
+    </div>
+    
+      <div class="table-wrapper" id="fin-container">
+        <table>
+          <thead id="cl-thead">
+            <tr>
+              <th data-key="name">Şirket</th>
+              <th data-key="price" style="text-align:right;">Fiyat</th>
+              <th data-key="Piyasa Değeri">Piyasa Değeri</th>
+              <th data-key="Firma Değeri">Firma Değeri</th>
+              <th data-key="Satış Gelirleri">Gelirler (Son 12 Ay)</th>
+              <th data-key="Brüt Kar Marjı">Brüt Kar Marjı</th>
+              <th data-key="Faaliyet Kâr Marjı">Faaliyet Kâr Marjı</th>
+              <th data-key="Cari Oran">Cari Oran</th>
+              <th data-key="Asit Test Oranı">Asit Test Oranı</th>
+              <th data-key="Borç/Öz Kaynak">Borç/Öz Kaynak</th>
+              <th data-key="Nakit Döngüsü">Nakit Döngüsü</th>
+              <th data-key="Stok Devir Hızı">Stok Devir Hızı</th>
+              <th data-key="Stok Süresi">Stok Süresi</th>
+              <th data-key="Alacak Devir Hızı">Alacak Devir Hızı</th>
+              <th data-key="Alacak Süresi">Alacak Süresi</th>          
+              <th data-key="Borç Devir Hızı">Borç Devir Hızı</th>
+              <th data-key="Borç Süresi">Borç Süresi</th>    
+              <th data-key="ROIC">ROIC</th>
+              <th data-key="ROA">ROA</th>
+              <th data-key="ROE">ROE</th>
+              <th data-key="PD/DD">PD/DD</th>
+              <th data-key="F/K">F/K</th>
+              <th data-key="Fiyat/Satışlar">Fiyat/Satışlar</th>
+            </tr>
+          </thead>
+          <tbody id="cl-tbody"></tbody>
+        </table>
+        <div id="clSentinel" style="height:1px;"></div>
+      </div>
+</div>
+<div id="view-sectors" class="view-section">
+ <div class="wrap sec-wrap" style="flex-direction:column;">
+    
+    <div class="sec-toolbar">
+        
+        <div id="secBadgeArea" class="sc-badge-area" style="padding:0; min-height:auto; margin:0;"></div>
+
+        <div class="sec-search-box">
+            <i class="fa-solid fa-magnifying-glass sec-search-icon"></i>
+            <input type="text" id="secSearchCompany" class="sec-search-input" 
+                   placeholder="Şirket ara (örn: THYAO)..." 
+                   oninput="secFindSectorByCompany(this.value)">
+        </div>
+
+        <div class="sec-search-box">
+            <i class="fa-solid fa-filter sec-search-icon"></i>
+            <input type="text" id="secSearchName" class="sec-search-input" 
+                   placeholder="Sektör filtrele..." 
+                   oninput="secFilterTable(this.value)">
+        </div>
+
+    </div>
+    
+    <div class="table-wrapper" id="sec-height-wrapper">
+      <table>
+        <thead id="sec-thead">
+          <tr>
+            <th data-key="name" style="display:flex; align-items:center; gap:8px;">
+    <i id="secMasterCaret" class="fa-solid fa-chevron-right sec-caret" 
+       style="cursor:pointer; width:16px; text-align:center;" 
+       onclick="secToggleAllRows(event)"></i>
+    <span>Sektör / Şirket</span>
+</th>
+            <th data-key="Piyasa Değeri">Piyasa Değeri</th>
+            <th data-key="Firma Değeri">Firma Değeri</th>
+            <th data-key="Brüt Kar Marjı">Brüt Kar Marjı</th>
+            <th data-key="Faaliyet Kâr Marjı">Faaliyet Marjı</th>
+            <th data-key="Cari Oran">Cari Oran</th>
+            <th data-key="Asit Test Oranı">Asit Test Oranı</th>
+            <th data-key="Borç/Öz Kaynak">Borç/Özkaynak</th>
+            <th data-key="Nakit Döngüsü">Nakit Döngüsü</th>
+            <th data-key="Stok Devir Hızı">Stok Devir Hızı</th>
+            <th data-key="Stok Süresi">Stok Süresi</th>
+            <th data-key="Alacak Devir Hızı">Alacak Devir Hızı</th>
+            <th data-key="Alacak Süresi">Alacak Süresi</th>
+            <th data-key="Borç Devir Hızı">Borç Devir Hızı</th>
+            <th data-key="Borç Süresi">Borç Süresi</th>
+            <th data-key="ROIC">ROIC</th>
+            <th data-key="ROA">ROA</th>
+            <th data-key="ROE">ROE</th>
+          </tr>
+        </thead>
+        <tbody id="sec-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div id="view-diagrams" class="view-section">
+  <div class="dg-container" id="dg-height-wrapper">
+
+    <div id="dgBadgeArea" class="sc-badge-area" style="padding:0; margin-bottom:20px;"></div>
+
+    <div class="dg-main-layout">
+      <div class="dg-chart-container">
+        <canvas id="matrixChart"></canvas>
+      </div>
+
+      <div class="dg-sidebar-panel">
+        <h4><i class="fa-solid fa-circle-info"></i> Analiz Rehberi</h4>
+        <div id="interp-content">Analiz seçtiğinizde burası güncellenecektir...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<div id="view-compare" class="view-section">
+  <div id="cmp-preloader" style="position:fixed; inset:0; z-index:99999; display:none; align-items:center; justify-content:center; background:#000;">
+    <div class="cmp-spinner" style="width:40px;height:40px;border:3px solid rgba(194,245,14,.1);border-top:3px solid #c2f50e;border-radius:50%;animation:cmpSpin 1s linear infinite"></div>
+  </div>
+
+  <div class="cmp-main-container" id="cmpHeightWrapper">
+
+    <div class="cmp-search-section">
+      
+      <div class="cmp-toolbar" style="display:flex; gap:12px; align-items:center; margin-bottom:15px;">
+          
+          <div id="cmpMarketBadge" class="sc-badge-area" style="padding:0; margin:0; min-height:auto;"></div>
+
+          <div class="cmp-search-wrap" style="flex:1; position:relative;">
+              <i class="fa-solid fa-magnifying-glass cmp-search-icon" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#666; font-size:12px;"></i>
+              <input type="text" id="cmpSearch" 
+                     style="width:100%; background:#111; border:1px solid #333; color:#fff; padding:10px 10px 10px 34px; border-radius:10px; font-size:13px; outline:none; font-weight:600; transition:0.2s;"
+                     placeholder="Şirket ara (örn: MGROS, THYAO...)" autocomplete="off">
+              <div id="cmpSearchResults" class="cmp-search-results"></div>
+          </div>
+
+      </div>
+
+      <div id="cmpBadgeArea" class="cmp-badge-area"></div>
+    </div>
+
+    <div class="cmp-table-wrapper">
+      <table>
+        <thead id="cmpThead"></thead>
+        <tbody id="cmpTbody"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<div id="view-portfolio" class="view-section">
+<div id="app">
+  <div class="left-panel">
+    <div class="header-bar">
+      <div style="font-weight:700; font-size:18px; display:flex; align-items:center; gap:10px;">
+         Finapsis Sanal Portföy
+      </div>
+      
+    </div>
+    <div class="search-box" id="pfSearchBox">
+  <i class="fa-solid fa-search search-icon"></i>
+  <input type="text" id="searchInput" placeholder="Hisse, Döviz, Emtia ara." oninput="pfRenderMarketList()">
+
+  <!-- ✅ Sektör filtre ikonu -->
+  <button class="pf-filter-btn" id="pfSectorBtn" title="Sektör Filtrele" onclick="pfToggleSectorPopup(event)">
+    <i class="fa-solid fa-filter"></i>
+  </button>
+
+  <!-- ✅ Popup (ikonun yanında açılır) -->
+  <div class="pf-sector-popup" id="pfSectorPopup" style="display:none;">
+    <div class="pf-sector-head">
+      <div class="pf-sector-title">Sektör</div>
+      <div class="pf-sector-actions">
+        <button class="pf-sector-clear" onclick="pfClearSectorFilter(event)">Temizle</button>
+        <i class="fa-solid fa-xmark pf-sector-close" onclick="pfCloseSectorPopup(event)"></i>
+      </div>
+    </div>
+    <div style="padding: 8px; border-bottom:1px solid rgba(255,255,255,0.1);">
+        <input type="text" id="pfSectorSearchInput" placeholder="Sektör ara..." 
+               style="width:100%; background:#1a1a1a; border:1px solid #333; color:#fff; padding:8px 10px; border-radius:8px; font-size:12px; outline:none; font-weight:600;" 
+               oninput="pfFilterSectorList(this.value)" onclick="event.stopPropagation()">
+    </div>
+    <div class="pf-sector-list" id="pfSectorList"></div>
+  </div>
+</div>
+
+    <div class="category-menu">
+      <div class="cat-item active" onclick="pfSetGroup('bist', this)">BIST</div>
+      <div class="cat-item" onclick="pfSetGroup('nyse', this)">NYSE</div>
+      <div class="cat-item" onclick="pfSetGroup('nasdaq', this)">NASDAQ</div>
+      <div class="cat-item" onclick="pfSetGroup('doviz', this)">Döviz</div>
+      <div class="cat-item" onclick="pfSetGroup('emtia', this)">Emtia</div>
+      <div class="cat-item" onclick="pfSetGroup('kripto', this)">Kripto</div>
+    </div>
+    <div class="market-list" id="marketList"></div>
+  </div>
+  <div class="right-panel" id="mainPanel"></div>
+</div>
+
+<!-- TRADE MODAL -->
+<div class="modal-overlay" id="tradeModal">
+  <div class="trade-modal">
+    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+      <h3 style="margin:0;">İşlem Emri</h3>
+      <i class="fa-solid fa-xmark" style="cursor:pointer; color:#666;" onclick="pfCloseTradeModal()"></i>
+    </div>
+
+    <!-- NEW: all-mode portfolio selector (hidden normally) -->
+    <select id="modalPortfolioSelect" class="portfolio-select" style="min-width:100%; width:100%; margin-bottom:12px; display:none;" onchange="pfSetTradePortfolio(this.value)"></select>
+
+    <div style="display:flex; background:#000; padding:4px; border-radius:12px; margin-bottom:15px;">
+      <div id="tabBuy" class="trade-tab-btn" onclick="pfUserClickSide('buy')">AL</div>
+      <div id="tabSell" class="trade-tab-btn" onclick="pfUserClickSide('sell')">SAT</div>
+    </div>
+
+    <!-- Input Mode Toggle -->
+    <div style="display:flex; background:#000; padding:4px; border-radius:12px; margin-bottom:25px; border:1px solid #222;">
+      <div id="modeQty" class="trade-tab-btn" onclick="pfSetInputMode('qty')">MİKTAR</div>
+      <div id="modeAmt" class="trade-tab-btn" onclick="pfSetInputMode('amount')">TUTAR</div>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:15px; margin-bottom:25px;">
+      <img id="modalImg" src="" style="width:48px; height:48px; background:#fff; border-radius:10px; padding:4px;">
+      <div>
+        <div id="modalTicker" style="font-weight:800; font-size:20px;">-</div>
+        <div id="modalPrice" style="font-size:16px; color:var(--primary); font-weight:600;">-</div>
+      </div>
+    </div>
+
+    <div style="font-size:12px; color:#888; text-align:right; margin-bottom:6px;" id="modalLimit">-</div>
+    <input type="number" id="tradeQty" class="form-input" placeholder="Miktar..." oninput="pfCalcTotal()">
+    <div id="tradeHint" style="font-size:11px; color:#666; margin:-6px 0 12px 0; text-align:right;"></div>
+
+    <div style="display:flex; justify-content:space-between; padding:15px; background:#000; border-radius:12px; margin-bottom:20px; border:1px solid #222;">
+      <span style="color:#888; font-size:13px;">Tahmini Tutar</span>
+      <div style="text-align:right;">
+        <span id="tradeTotal" style="font-weight:700; font-size:15px; display:block;">0.00</span>
+        <span id="tradeTotalTry" style="font-size:11px; color:#666; display:block;"></span>
+      </div>
+    </div>
+    <button id="btnConfirmTrade" class="btn btn-primary" style="width:100%;" disabled onclick="pfSubmitTrade()">EMRİ GÖNDER</button>
+  </div>
+</div>
+
+<!-- TRANSFER (VIRMAN) MODAL -->
+<div class="modal-overlay" id="transferModal">
+  <div class="trade-modal">
+    <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+      <h3 style="margin:0;">Virman</h3>
+      <i class="fa-solid fa-xmark" style="cursor:pointer; color:#666;" onclick="pfCloseTransferModal()"></i>
+    </div>
+
+    <div style="font-size:12px; color:#888; margin-bottom:6px;">Kaynak Portföy</div>
+    <select id="trFrom" class="portfolio-select" style="min-width:100%; width:100%; margin-bottom:12px;" onchange="pfOnTransferFromChange(this.value)"></select>
+
+    <div style="font-size:12px; color:#888; margin-bottom:6px;">Hedef Portföy</div>
+    <select id="trTo" class="portfolio-select" style="min-width:100%; width:100%; margin-bottom:12px;"></select>
+
+    <div style="font-size:12px; color:#888; margin-bottom:6px;">Enstrüman</div>
+    <select id="trTicker" class="portfolio-select" style="min-width:100%; width:100%; margin-bottom:12px;" onchange="pfUpdateTransferLimit()"></select>
+
+    <div style="font-size:12px; color:#888; margin-bottom:6px; text-align:right;" id="trLimit">-</div>
+    <input type="number" id="trQty" class="form-input" placeholder="Miktar giriniz..." oninput="pfValidateTransfer()">
+
+    <button id="btnConfirmTransfer" class="btn btn-primary" style="width:100%;" disabled onclick="pfSubmitTransfer()">VİRMAN YAP</button>
+    <button class="btn" style="width:100%; background:#222; color:#fff; margin-top:10px;" onclick="pfCloseTransferModal()">İptal</button>
+  </div>
+</div>
+<!-- HISTORY MODAL -->
+<div class="modal-overlay" id="pfHistModal">
+  <div class="hist-modal">
+    <div class="hist-head">
+      <div>
+        <div id="pfHistTitle" class="hist-title">-</div>
+        <div id="pfHistSub" class="hist-sub">-</div>
+      </div>
+      <i class="fa-solid fa-xmark hist-close" onclick="pfCloseHistoryModal()"></i>
+    </div>
+
+    <div class="hist-body">
+      <div id="pfHistLoading" class="hist-loading">Yükleniyor...</div>
+      <canvas id="pfHistCanvas"></canvas>
+    </div>
+  </div>
+</div>
+</div>
+
+
+
+<div id="view-detail" class="view-section">
+<div class="wrap">
+    <!-- DETAIL LOADING OVERLAY -->
+<div id="detailLoadingOverlay" class="detail-loading-overlay" style="display:none;">
+  <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+    <div class="spinner"></div>
+    <div style="color:#9a9a9a; font-weight:900; font-size:12px;">Yükleniyor...</div>
+  </div>
+</div>
+
+
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
+
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl flex items-center justify-center p-2 overflow-hidden">
+        <img id="companyLogo" src="" alt="" class="w-full h-full object-contain hidden" />
+        <i id="companyLogoFallback" class="fa-solid fa-building text-2xl text-white"></i>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span id="tickerPill" class="bg-[#1a2205] text-[#c2f50e] border border-[#c2f50e]/30 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wide">-</span>
+          <span class="text-[10px] font-extrabold text-[#8a8a8a] uppercase tracking-widest">Şirket Detayı</span>
+        </div>
+        <h1 id="companyTitle" class="text-2xl font-extrabold text-white tracking-tight leading-tight">-</h1>
+        <div id="companyMeta" class="text-xs text-[#8a8a8a] font-semibold mt-1">-</div>
+      </div>
+    </div>
+
+    <!-- Search + Price -->
+    <div class="flex flex-col items-end gap-3 w-full md:w-auto">
+      <div class="flex items-center gap-2 search-wrap">
+        <input id="tickerSearch" class="search-input" placeholder="Şirket ara (ticker / isim)" autocomplete="off" />
+        
+
+        <div id="searchDD" class="search-dd"></div>
+      </div>
+
+      <div class="text-right">
+        <div id="headerPrice" class="text-3xl font-extrabold text-white flex items-center justify-end gap-2">
+  <span id="headerCaret" class="hidden text-2xl leading-none"></span>
+  <span id="headerPriceVal">-</span>
+</div>
+
+<div class="font-extrabold text-xs flex items-center justify-end gap-2 mt-1" id="headerChange" style="visibility:hidden;">
+  <i id="headerTrendIcon" class="fa-solid fa-arrow-trend-up"></i>
+  <span id="headerChangeVal">-</span>
+</div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Left -->
+    <div class="lg:col-span-8 flex flex-col gap-6">
+
+      <!-- About -->
+      <!-- About -->
+<div class="fin-card p-6" id="cardAbout"> <h3 class="text-white font-extrabold text-sm">Hakkında</h3>
+  <p class="text-sm text-[#bdbdbd] leading-relaxed mt-4" id="aboutText">-</p>
+</div>
+
+
+      <!-- Chart -->
+      <div class="fin-card p-5">
+        <div class="flex justify-between items-center mb-3 gap-3">
+          <h3 class="text-white font-extrabold text-sm" id="chartTitle">Hisse Fiyatı</h3>
+
+          <div class="flex gap-2 flex-wrap justify-end" id="rangeBtns" aria-label="Zaman aralığı">
+            <button class="tab-btn" data-range="MAX" type="button">MAX</button>
+            <button class="tab-btn active" data-range="1Y" type="button">1Y</button>
+            <button class="tab-btn" data-range="6M" type="button">6A</button>
+            <button class="tab-btn" data-range="3M" type="button">3A</button>
+            <button class="tab-btn" data-range="1M" type="button">1A</button>
+          </div>
+        </div>
+        <div id="priceChart" class="-ml-2"></div>
+      </div>
+
+      <!-- Financials -->
+      <div class="fin-card flex flex-col" id="cardFinancials"> <div class="card-head tab-scroll" id="financialTabs" role="tablist" aria-label="Finansal tablolar">
+  <button class="tab-btn active" data-tab="ratios" type="button" role="tab" aria-selected="true">Genel Bakış</button>
+  <button class="tab-btn" data-tab="income" type="button" role="tab" aria-selected="false">Gelir Tablosu</button>
+  <button class="tab-btn" data-tab="balance-sheet" type="button" role="tab" aria-selected="false">Bilanço</button>
+  <button class="tab-btn" data-tab="cash-flow-statement" type="button" role="tab" aria-selected="false">Nakit Akış Tablosu</button>
+</div>
+
+
+<div class="overflow-x-auto" id="financialTableWrap">
+          <table class="fin-table" aria-label="Finansal tablo">
+            <thead>
+              <tr>
+                <th width="35%">Kalem</th>
+                <th width="16%">TTM</th>
+                <th width="16%" id="y1Head">-</th>
+                <th width="16%" id="y2Head">-</th>
+                <th width="16%" id="y3Head">-</th>
+              </tr>
+            </thead>
+            <tbody id="financialsBody">
+              <tr><td colspan="5" style="text-align:center; padding:18px; color:#666; font-weight:900;">Finansallar yükleniyor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+                <!-- Genel Bakış (Oranlar) altında metrikler -->
+        <div id="overviewMetricsCard" style="display:none; padding:16px; border-top:1px solid rgba(255,255,255,.08);">
+          <div class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest mb-3">Oranlar</div>
+          <div id="overviewMetricsList">
+            <div style="text-align:center; padding:18px; color:#666; font-weight:900;">Metrikler yükleniyor...</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Right -->
+    <div class="lg:col-span-4 flex flex-col gap-6">
+
+      <!-- 52 week -->
+      <div class="fin-card p-5">
+        <div class="flex justify-between items-center mb-5">
+          <span class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest">52 Hafta Aralık</span>
+          <span class="text-[10px] font-black text-[#6b6b6b] uppercase tracking-widest">Konum</span>
+        </div>
+
+        <div class="range-container">
+          <div class="range-track" aria-hidden="true">
+            <div class="range-fill" id="rangeFill" style="width:0%"></div>
+            <div class="range-thumb" id="rangeThumb" style="left:0%">
+              <div class="range-label-float" id="currentPriceLabel">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between mt-3">
+          <div class="text-left">
+            <div class="text-[#6b6b6b] text-[10px] font-black uppercase tracking-widest">En Düşük</div>
+            <div class="text-white text-sm font-extrabold font-mono" id="lowPrice">-</div>
+          </div>
+          <div class="text-right">
+            <div class="text-[#6b6b6b] text-[10px] font-black uppercase tracking-widest">En Yüksek</div>
+            <div class="text-white text-sm font-extrabold font-mono" id="highPrice">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics -->
+     <!-- Genel Bilgiler + Mini Finans Bar -->
+<div class="fin-card p-5" id="snapshotCard">
+  <div class="flex justify-between items-center mb-4">
+    <span class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest">Genel Bilgiler</span>
+  </div>
+
+  <div class="text-xs font-black uppercase tracking-widest text-[#8a8a8a] mb-2">Son 4 Dönem: Gelir &amp; Kâr</div>
+  <div class="mini-legend">
+  <span class="mini-leg-item"><span class="dot rev"></span> Gelir</span>
+  <span class="mini-leg-item"><span class="dot prof"></span> Net Kâr</span>
+</div>
+
+  <div class="mini-bars-wrap" id="miniBarsWrap">
+    <div style="text-align:center; padding:18px; color:#666; font-weight:900; width:100%;">Finansallar yükleniyor...</div>
+  </div>
+
+  <div class="snapshot-grid">
+    <div class="snapshot-row"><div class="k">Sektör</div><div class="v" id="sectorVal">-</div></div>
+    <div class="snapshot-row"><div class="k">Market Cap</div><div class="v" id="mcapVal">-</div></div>
+    <div class="snapshot-row"><div class="k">Kuruluş</div><div class="v" id="foundedVal">-</div></div>
+    <div class="snapshot-row"><div class="k">Çalışan</div><div class="v" id="empVal">-</div></div>
+    <div class="snapshot-row"><div class="k">Ticker</div><div class="v" id="tickerVal">-</div></div>
+  </div>
+</div>
+
+
+      <!-- News -->
+      <div class="fin-card flex flex-col">
+        <div class="card-head">
+          <h3 class="text-[#c2f50e] font-black text-xs uppercase tracking-widest">İlgili Haberler</h3>
+        </div>
+        <div id="newsList">
+          <div class="p-4 text-sm text-[#888] font-semibold">Haberler yükleniyor...</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="h-10"></div>
+</div>
+</div>
+
+<div id="view-indicators" class="view-section">
+  <div class="wrap">
+
+    <div id="indBadgeArea" class="sc-badge-area" style="padding:0; margin-bottom:20px; min-height:auto;"></div>
+    <div id="indAsOf" style="margin: -10px 0 12px 0; color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 700;">
+  Son güncelleme: -
+</div>
+
+    
+    <div class="table-wrapper" style="overflow: auto; flex: 1; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: #0b0b0b;">
+      <table style="width: 100%; min-width: 1000px; border-collapse: separate; border-spacing: 0;">
+        <thead>
+          <tr>
+            <th style="text-align: left; position: sticky; left: 0; top: 0; z-index: 100; background: #1a1a1a; padding: 16px 12px;">Gösterge</th>
+            <th style="position: sticky; top: 0; z-index: 50; background: #1a1a1a; padding: 16px 12px; text-align: right;">Son Değer</th>
+            <th style="position: sticky; top: 0; z-index: 50; background: #1a1a1a; padding: 16px 12px; text-align: right;">Önceki</th>
+            <th style="position: sticky; top: 0; z-index: 50; background: #1a1a1a; padding: 16px 12px; text-align: right;">Değişim (Önceki)</th>
+            <th style="position: sticky; top: 0; z-index: 50; background: #1a1a1a; padding: 16px 12px; text-align: right;">Değişim (YTD)</th>
+            <th style="position: sticky; top: 0; z-index: 50; background: #1a1a1a; padding: 16px 12px; text-align: right;">Değişim (12 Ay)</th>
+          </tr>
+        </thead>
+        <tbody id="indicators-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div id="view-calendar-list" class="view-section">
+  <div class="wrap">
+    
+
+    <div class="cal-filter-bar">
+        <div class="cal-filter-group">
+            <button class="cal-pill active" onclick="calListSetTime('today', this)">Bugün</button>
+            <button class="cal-pill" onclick="calListSetTime('tomorrow', this)">Yarın</button>
+            <button class="cal-pill" onclick="calListSetTime('yesterday', this)">Dün</button>
+            <button class="cal-pill" onclick="calListSetTime('this-week', this)">Bu Hafta</button>
+            <button class="cal-pill" onclick="calListSetTime('next-week', this)">Gelecek Hafta</button>
+            <button class="cal-pill" onclick="calListSetTime('prev-week', this)">Geçen Hafta</button>
+            <button class="cal-pill" onclick="calListSetTime('this-month', this)">Bu Ay</button>
+            <button class="cal-pill" onclick="calListSetTime('next-month', this)">Gelecek Ay</button>
+            <button class="cal-pill" onclick="calListSetTime('prev-month', this)">Geçen Ay</button>
+        </div>
+
+        <div class="cal-filter-group">
+            <button class="cal-icon-btn" onclick="calListToggleFilter('region', 'tr', this)" title="Türkiye">
+                <img src="https://flagcdn.com/w40/tr.png">
+            </button>
+            <button class="cal-icon-btn" onclick="calListToggleFilter('region', 'us', this)" title="ABD">
+                <img src="https://flagcdn.com/w40/us.png">
+            </button>
+            <button class="cal-icon-btn" onclick="calListToggleFilter('region', 'eu', this)" title="Euro Bölgesi">
+                <img src="https://flagcdn.com/w40/eu.png">
+            </button>
+        </div>
+
+        <div class="cal-filter-group" style="padding-left:8px;">
+            <div class="cal-impact-rating" id="calImpactFilter" data-level="1" title="Etki Seviyesi Seç">
+                <svg class="cal-impact-item" viewBox="0 0 24 24" onclick="calListSetImpact(1, event)">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                <svg class="cal-impact-item" viewBox="0 0 24 24" onclick="calListSetImpact(2, event)">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                <svg class="cal-impact-item" viewBox="0 0 24 24" onclick="calListSetImpact(3, event)">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="cal-search-wrap">
+            <i class="fa-solid fa-search cal-search-icon"></i>
+            <input type="text" class="cal-search-input" placeholder="Etkinlik ara..." oninput="calListSearch(this.value)">
+        </div>
+    </div>
+    <div id="calAsOf" style="margin: -10px 0 12px 0; color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 700;">
+  Son güncelleme: -
+</div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Ekonomik Gösterge</th>
+            <th>Etki</th>
+            <th>Beklenen</th>
+            <th>Gerçekleşen</th>
+            <th>Önceki</th>
+            <th>Hatırlat</th>
+          </tr>
+        </thead>
+        <tbody id="calendar-list-tbody">
+            </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="calListModalOverlay" class="modal-overlay">
+  <div id="calListModalContent" class="modal-content">
+    
+    <div id="calFormContainer">
+      <div class="modal-title">Etkinlik Hatırlatıcı</div>
+      <div class="input-group">
+        <label>Ad Soyad</label>
+        <input type="text" id="calUserName" placeholder="Adınız Soyadınız">
+      </div>
+      <div class="input-group">
+        <label>E-posta Adresi</label>
+        <input type="email" id="calUserEmail" placeholder="ornek@mail.com">
+      </div>
+      <div class="check-group">
+        <input type="checkbox" id="calCheckConsent">
+        <label for="calCheckConsent">Bilgilerimin kaydedilmesine ve işlenmesine izin veriyorum.</label>
+      </div>
+      <div class="check-group">
+        <input type="checkbox" id="calCheckNews">
+        <label for="calCheckNews">Finapsis gelişmelerinden haberdar olmak istiyorum.</label>
+      </div>
+      <button id="calSendBtn" class="submit-btn" disabled>Beni Bilgilendir</button>
+      <button onclick="calCloseListModal()" style="background:none; border:none; color:#aaa; width:100%; margin-top:10px; font-size:12px; cursor:pointer;">Vazgeç</button>
+    </div>
+
+    <div id="calSuccessContainer" style="display:none; text-align:center; padding: 20px 0;">
+      <div style="font-size: 50px; color: #c2f50e; margin-bottom: 15px;">✓</div>
+      <div class="modal-title" style="margin-bottom: 8px;">Hatırlatıcı Oluşturuldu!</div>
+      <p style="color: #aaa; font-size: 14px;">Etkinlik gerçekleştiğinde size mail göndereceğiz.</p>
+    </div>
+
+  </div>
+</div>
+<div id="view-news" class="view-section">
+  <div class="wrap">
+    
+    <div id="finapsis-news-widget">
+        <div class="widget-header">
+            
+            <div class="search-container">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="news-search-input" placeholder="Haber, şirket ara..." autocomplete="off">
+            </div>
+
+            <button id="open-filter-btn" class="icon-btn mobile-filter-trigger" aria-label="Filtrele">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                <div id="filter-badge" class="filter-badge" style="display:none;"></div>
+            </button>
+        </div>
+
+        <div class="widget-layout">
+            
+            <div class="layout-main">
+                <div id="filter-status-bar" style="display: none; flex-wrap: wrap; gap: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px; margin-bottom: 15px;">
+                    <div id="active-filters-list" style="display: flex; flex-wrap: wrap; gap: 8px; flex-grow: 1;"></div>
+                    <button id="clear-filter-btn" style="background: transparent; border: none; color: var(--finapsis-neon); font-size: 10px; font-weight: 900; cursor: pointer; text-transform: uppercase; white-space: nowrap; margin-left: auto;">TEMİZLE</button>
+                </div>
+
+                <div id="news-container" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                
+                <div id="empty-state" style="display: none; text-align: center; padding: 40px; color: var(--finapsis-text-sub); font-size: 12px;">
+                    Aradığınız kriterlere uygun haber bulunamadı.
+                </div>
+
+                <div id="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--finapsis-border);">
+                    <button id="prev-page-btn" class="page-btn">← ÖNCEKİ</button>
+                    <span id="page-info" style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.6);"></span>
+                    <button id="next-page-btn" class="page-btn">SONRAKİ →</button>
+                </div>
+            </div>
+
+            <div id="filter-modal-overlay" class="modal-wrapper">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h3>FİLTRELE</h3>
+                        <button class="close-modal-trigger modal-close">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="filter-group">
+                            <label>DUYGU DURUMU</label>
+                            <div id="modal-tags-sentiment" class="modal-tags-container"></div>
+                        </div>
+                        <div class="filter-group">
+                            <label>BÖLGE</label>
+                            <div id="modal-tags-region" class="modal-tags-container"></div>
+                        </div>
+                        <div class="filter-group">
+                            <label>SEKTÖR</label>
+                            <div id="modal-tags-sector" class="modal-tags-container"></div>
+                        </div>
+                        <div class="filter-group">
+                            <label>KATEGORİ</label>
+                            <div id="modal-tags-category" class="modal-tags-container"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="display:flex; gap:10px;">
+                      <button id="modal-apply-btn" style="flex:1;">
+                        FİLTREYİ UYGULA
+                      </button>
+                      <button id="modal-clear-btn" style="flex:1; background:transparent; border:1px solid rgba(255,255,255,0.3); color:#fff; font-weight:800; font-size:11px; border-radius:8px; padding:10px; cursor:pointer;">
+                        TEMİZLE
+                      </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div id="share-modal-overlay" class="share-overlay" style="display:none;">
+            <div class="share-card">
+                <div class="modal-header">
+                    <h3>HABERİ PAYLAŞ</h3>
+                    <button id="close-share-btn" class="modal-close">✕</button>
+                </div>
+                <div class="share-body">
+                    <div class="share-preview-text" id="share-title-preview"></div>
+                    <div class="share-grid">
+                        <button class="share-item" id="share-x">
+                            <div class="share-icon">𝕏</div>
+                            <span>X / Twitter</span>
+                        </button>
+                        <button class="share-item" id="share-wa">
+                            <div class="share-icon" style="background:#25D366; color:#fff;">💬</div>
+                            <span>WhatsApp</span>
+                        </button>
+                        <button class="share-item" id="share-li">
+                            <div class="share-icon" style="background:#0077b5; color:#fff;">in</div>
+                            <span>LinkedIn</span>
+                        </button>
+                        <button class="share-item" id="share-copy">
+                            <div class="share-icon" style="background:#333; color:#fff;">🔗</div>
+                            <span>Linki Kopyala</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    
+  </div>
+</div>
+
+
+<div id="fpRowMenuOverlay" onclick="fpCloseRowMenu()">
+  <div id="fpRowMenu" onclick="event.stopPropagation()">
+    <div class="fpMenuHead">
+      <div class="fpMenuTitle">İşlemler • <span id="fpMenuTicker" class="fpMenuTicker">-</span></div>
+      <div class="fpMenuClose" onclick="fpCloseRowMenu()"><i class="fa-solid fa-xmark"></i></div>
+    </div>
+
+    <div class="fpMenuItem" id="fpMenuDetail">
+      <div class="fpMenuIcon"><i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+      Detaya Git
+    </div>
+
+    <div class="fpMenuItem" id="fpMenuBuy">
+      <div class="fpMenuIcon"><i class="fa-solid fa-cart-shopping"></i></div>
+      Al
+    </div>
+
+    <div class="fpMenuItem" id="fpMenuSell">
+      <div class="fpMenuIcon"><i class="fa-solid fa-right-left"></i></div>
+      Sat
+    </div>
+
+    <div class="fpMenuItem" id="fpMenuWatch">
+      <div class="fpMenuIcon"><i class="fa-solid fa-eye"></i></div>
+      İzle
+    </div>
+  </div>
+</div>
+
+  <!-- App JS -->
+  <script src="./app.js"></script>
+</body>
+</html>
