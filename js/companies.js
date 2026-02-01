@@ -554,13 +554,13 @@ window.clUpdateFilterBadges = function() {
                     <button onclick="clClearAllRanges(event)" style="background:none; border:none; color:#c2f50e; font-size:11px; font-weight:700; cursor:pointer; padding:0;">Temizle</button>
                 </div>
                 ${clBuildFilterGroup('Değerleme', [
-                    {key:'Piyasa Değeri', label:'Piyasa Değeri', unit:'Mn ₺'},
-                    {key:'Firma Değeri', label:'Firma Değeri', unit:'Mn ₺'},
+                    {key:'Piyasa Değeri', label:'Piyasa Değeri', unit:(['nyse','nasdaq'].includes(window.activeGroup) ? 'Mn $' : 'Mn ₺')},
+                    {key:'Firma Değeri', label:'Firma Değeri', unit:(['nyse','nasdaq'].includes(window.activeGroup) ? 'Mn $' : 'Mn ₺')},
                     {key:'PD/DD', label:'PD/DD', unit:''},
                     {key:'F/K', label:'F/K', unit:''}
                 ])}
                 ${clBuildFilterGroup('Gelir & Kar', [
-                    {key:'Satış Gelirleri', label:'Gelirler', unit:'Mn ₺'},
+                    {key:'Satış Gelirleri', label:'Gelirler', unit:(['nyse','nasdaq'].includes(window.activeGroup) ? 'Mn $' : 'Mn ₺')},
                     {key:'Brüt Kar Marjı', label:'Brüt Kar Marjı', unit:'%'},
                     {key:'Faaliyet Kâr Marjı', label:'Faaliyet Kar Marjı', unit:'%'}
                 ])}
