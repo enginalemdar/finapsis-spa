@@ -99,11 +99,7 @@
   }
 
   function cmpUpdateHeight() {
-    try {
-      const root = document.getElementById('cmpHeightWrapper') || document.getElementById('view-compare');
-      const h = Math.max(600, Math.ceil((root && root.scrollHeight) ? root.scrollHeight : 800) + 20);
-      if(window.parent) window.parent.postMessage({ type: 'resize-iframe', height: h }, '*');
-    } catch(e) {}
+    // postMessage ile resize hiç handle edilmediğinden kaldırıldı
   }
 
   // --- SEARCH LOGIC ---
