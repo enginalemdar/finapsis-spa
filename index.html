@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   
   <script src="https://cdn.tailwindcss.com"></script>
-  
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
@@ -67,7 +66,22 @@
   </div>
 
   <script>
-    async function loadViews() {
+    // Scriptleri sırayla yüklemek için yardımcı fonksiyon
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = false; // Sırayı koru
+            script.onload = () => resolve(src);
+            script.onerror = () => reject(new Error(`Script yüklenemedi: ${src}`));
+            document.body.appendChild(script);
+        });
+    }
+
+    async function initApp() {
+      console.log("🚀 [App] Başlatılıyor...");
+
+      // 1. ÖNCE HTML GÖRÜNÜMLERİNİ YÜKLE
       const views = [
         { id: 'view-screener', file: 'views/screener.html' },
         { id: 'view-companies', file: 'views/companies.html' },
@@ -81,8 +95,7 @@
         { id: 'view-news', file: 'views/news.html' }
       ];
 
-      // Tüm HTML dosyalarını paralel olarak çek
-      const promises = views.map(async (v) => {
+      const viewPromises = views.map(async (v) => {
         try {
           const resp = await fetch(v.file);
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -91,47 +104,35 @@
           if (el) el.innerHTML = html;
         } catch (e) {
           console.error(`Görünüm yüklenemedi: ${v.file}`, e);
-          const el = document.getElementById(v.id);
-          if(el) el.innerHTML = `<div style="color:red; padding:20px;">Hata: ${v.file} yüklenemedi.</div>`;
         }
       });
 
-      await Promise.all(promises);
-      console.log("✅ Tüm HTML görünümleri yüklendi.");
+      await Promise.all(viewPromises);
+      console.log("✅ [App] HTML görünümleri yüklendi. DOM hazır.");
+
+      // 2. SONRA SCRIPTLERİ YÜKLE (Global en başa)
+      // Artık DOM dolu olduğu için scriptler elementleri bulabilir.
+      const scripts = [
+          'js/global.js', // Önce bu yüklenmeli
+          'js/screener.js',
+          'js/companies.js',
+          'js/sectors.js',
+          'js/diagrams.js',
+          'js/compare.js',
+          'js/portfolio.js',
+          'js/detail.js',
+          'js/calendar.js',
+          'js/news.js'
+      ];
+
+      for (const src of scripts) {
+          await loadScript(src);
+      }
+      console.log("✅ [App] Scriptler yüklendi.");
     }
 
-    // 2. ADIM: Önce HTML'leri yükle, sonra Scriptleri başlat
-    window.addEventListener('DOMContentLoaded', async () => {
-        // Güvenlik: 5 saniye sonra preloader hala varsa zorla kapat (Hata durumunda siyah ekran kalmasın)
-        setTimeout(() => {
-            const pl = document.getElementById("preloader");
-            if(pl) pl.style.display = 'none';
-        }, 5000);
-
-        await loadViews();
-
-        // HTML yüklendikten sonra JS dosyalarını dinamik olarak yükle
-        // Sıralama önemlidir: Global önce, diğerleri sonra
-        const scripts = [
-            'js/global.js',
-            'js/screener.js',
-            'js/companies.js',
-            'js/sectors.js',
-            'js/diagrams.js',
-            'js/compare.js',
-            'js/portfolio.js',
-            'js/detail.js',
-            'js/calendar.js',
-            'js/news.js'
-        ];
-
-        for (const src of scripts) {
-            const script = document.createElement('script');
-            script.src = src;
-            script.async = false; // Sırayla yüklenmelerini sağlar
-            document.body.appendChild(script);
-        }
-    });
+    // Uygulamayı Başlat
+    window.addEventListener('DOMContentLoaded', initApp);
   </script>
 
 </body>
