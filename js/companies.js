@@ -403,9 +403,6 @@ window.initCompaniesList = function(){
   
   if(window.clUpdateFilterBadges) window.clUpdateFilterBadges();
 
-  const tbody = document.getElementById("cl-tbody");
-  if(tbody) tbody.innerHTML = '<tr><td colspan="20" style="text-align:center; padding:50px; color:#666;"><div class="spinner" style="margin:0 auto 10px auto;"></div>Veriler Analiz Ediliyor...</td></tr>';
-
   if (typeof finBuildMapForActiveGroup === "function") {
     finBuildMapForActiveGroup(() => {
       clUpdateSortHeaderUI(); 
