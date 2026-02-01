@@ -1,3 +1,5 @@
+
+
 // --- ORTAK GLOBAL VERİLER & SABİTLER ---
     // Şirket veri yapısı örn: { ticker, name, group: "bist"|"sp"|"doviz"|"emtia"|"kripto", logourl, slug, unit }
 // --- CLOUDFLARE DATA URL ---
@@ -677,21 +679,55 @@ function fpEnsureInit(tabName){
     try { initCompaniesList(); } catch(e) {}
   }
 }
+// ✅ Bubble -> SPA iframe session bridge
+window.__SESSION__ = window.__SESSION__ || null;
+
+// finapsis.co dışında bir domain kullanıyorsan burayı güncelle
+const FIN_ALLOWED_PARENTS = new Set([
+  "https://finapsis.co",
+  "https://www.finapsis.co",
+  // Bubble test domain’in varsa ekle (ör: https://finapsis.bubbleapps.io)
+]);
+
+function finApplyPlanLockUI() {
+  const plan = finGetPlan();
+  const isFree = (plan === "free");
+
+  const scrBtn =
+    document.querySelector('nav.app-tabs .tab-btn[data-tab="screener.html"]') ||
+    Array.from(document.querySelectorAll("nav.app-tabs .tab-btn"))
+      .find(b => (b.getAttribute("onclick") || "").includes("screener.html"));
+
+  if (!scrBtn) return;
+
+  if (isFree) {
+    scrBtn.classList.add("locked");
+    scrBtn.title = "Pro üyelik gerektirir";
+  } else {
+    scrBtn.classList.remove("locked");
+    scrBtn.title = "";
+  }
+}
+
+window.addEventListener("message", (ev) => {
+  if (!FIN_ALLOWED_PARENTS.has(ev.origin)) return;
+
+  const msg = ev.data || {};
+  if (msg.type === "FIN_SESSION" && msg.payload) {
+    window.__SESSION__ = msg.payload;
+    console.log("[SESSION OK]", window.__SESSION__);
+    finApplyPlanLockUI();
+  }
+});
+
 function finGetPlan() {
   try {
-    // Bubble’dan gelen session öncelikli
     const s = window.__SESSION__ || null;
     if (s?.plan) return String(s.plan).toLowerCase();
   } catch (e) {}
-
-  try {
-    // Test için query param destek
-    const p = new URLSearchParams(location.search).get("plan");
-    if (p) return String(p).toLowerCase();
-  } catch (e) {}
-
   return "free";
 }
+
 
 function finIsFree() {
   return finGetPlan() === "free";
