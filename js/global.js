@@ -872,11 +872,11 @@ async function bootFinapsis() {
           window.cmpRender();
         }
         if (activeTab === 'screener.html' || !activeTab) {
-          if (typeof renderScreenerResults === "function") {
-            console.log("🎯 [Boot] Screener render ediliyor...");
-            renderScreenerResults();
+          if (typeof initScreener === "function") {
+            console.log("🎯 [Boot] Screener initScreener ediliyor...");
+            initScreener();
           } else {
-            console.warn("⚠️ [Boot] renderScreenerResults henüz tanımlı değil");
+            console.warn("⚠️ [Boot] initScreener henüz tanımlı değil");
           }
         }
         if (activeTab === 'companieslist.html' && typeof renderCompanyList === "function") {
