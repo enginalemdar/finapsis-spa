@@ -599,6 +599,10 @@ nav.app-tabs .tab-btn.active {
   height: 56px;
 }
 
+#view-companies tbody tr:hover td {
+  background: #161616 !important;
+}
+
 #view-companies tbody td {
   padding: 0 10px;
   border-bottom: 1px solid rgba(255, 255, 255, .04);
@@ -611,11 +615,11 @@ nav.app-tabs .tab-btn.active {
 }
 
 #view-companies .val-up {
-  color: #00ff88
+  color: #9dffb3
 }
 
 #view-companies .val-down {
-  color: #ff4444
+  color: #ff9d9d
 }
 
 #filterOverlay {
