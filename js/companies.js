@@ -114,10 +114,15 @@ function renderCompanyList() {
   const append = (__clAppendRequested && key === __clLastKey);
   __clAppendRequested = false;
 
-  // Key aynı, append yok, tablo zaten render edildi → sadece fiyatları in-place güncelle
-  if (!append && key === __clLastKey && __clRenderedCount > 0) {
-    clUpdatePricesInPlace();
-    return;
+  // Key aynı, append yok, tablo zaten dolu ve veriler var → in-place fiyat güncelle
+  if (!append && key === __clLastKey && tbody.children.length > 0) {
+    // İlk row'un 3. td'si (Piyasa Değeri) boş mı? Boşsa full re-render yap
+    const firstRow = tbody.children[0];
+    const pvTd = firstRow && firstRow.children[2];
+    if (pvTd && pvTd.textContent.trim() !== '-' && pvTd.textContent.trim() !== '') {
+      clUpdatePricesInPlace();
+      return;
+    }
   }
 
   if (!append) {
