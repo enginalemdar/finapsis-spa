@@ -221,7 +221,9 @@ function renderCompanyList() {
       tr.innerHTML = `
         <td>
           <div style="display:flex; align-items:center; gap:12px;">
-            <img src="${c.logourl}" loading="lazy" style="width:32px; height:32px; object-fit:contain; background:#111; border-radius:6px; flex-shrink: 0;" onerror="this.style.display='none'">
+            <img src="${c.logourl}" loading="lazy" decoding="async" fetchpriority="low"
+                 style="width:32px; height:32px; object-fit:contain; background:#111; border-radius:6px; flex-shrink: 0;"
+                 onerror="this.style.display='none'">
             <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden;">
               <a href="https://finapsis.co/comdetail/${c.slug}" target="_top" style="font-weight:600; font-size:14px; color:#fff; text-decoration:none;">${c.name}</a>
               <div style="font-size:11px; color:#666;">${c.ticker} • ${c.sector}</div>

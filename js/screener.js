@@ -83,7 +83,12 @@ function processScreenerData() {
 function getStatValue(sector, metricKey, method) {
     // 🚀 GLOBAL JSON'DAN OKU (HESAPLAMA YOK!)
     const stats = window.__SCREENER_STATS_CACHE || {};
-    const groupData = stats[window.activeGroup] || {}; // "bist", "nyse" vb.
+    const g = String(window.activeGroup || "bist");
+    let groupData = stats[g] || {};
+    // ✅ US grupları çoğu zaman "sp" altında geliyor
+    if ((!groupData || Object.keys(groupData).length === 0) && (g === "nyse" || g === "nasdaq")) {
+        groupData = stats["sp"] || stats["us"] || groupData || {};
+    } // "bist", "nyse" vb.
 
     let statObj = null;
 
