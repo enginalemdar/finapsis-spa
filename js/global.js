@@ -41,34 +41,44 @@ const METRIC_KEY_MAP = {
 };
 
 // Global Veri Yükleyici (Şirketler + Fiyatlar)
+// js/global.js (Sadece loadFinapsisData kısmını değiştirin, diğer kısımlar aynı kalsın)
+
+// ... (Üstteki sabitler ve METRIC_KEY_MAP aynı kalsın) ...
+
 async function loadFinapsisData() {
   console.log("📥 [Data] Veri indirme başladı...");
+  
+  // 1. Mevcut fetch işlemleri
   const pCompanies = fetch(window.COMPANIES_DATA_URL);
   const pPrices = fetch(`${window.FIN_DATA_BASE}/price/detail.v1.json`);
   const pIndMap = fetch(`${window.FIN_DATA_BASE}/indicators/indicatorsmap.json`);
   const pIndSum = fetch(`${window.FIN_DATA_BASE}/indicators/summary.v1.json`);
+  
+  // ✅ 2. YENİ: İstatistik Dosyasını Çek
+  // (Dosya henüz yoksa {} döner, hata vermez)
+  const pStats = fetch(`${window.FIN_DATA_BASE}/static/screener_stats.v1.json`)
+                  .then(res => res.ok ? res.json() : {})
+                  .catch(() => ({})); 
 
   try {
-    const [resComp, resPrice, resIndMap, resIndSum] = await Promise.all([
-      pCompanies, pPrices, pIndMap, pIndSum
+    // 3. Hepsini Paralel Bekle
+    const [resComp, resPrice, resIndMap, resIndSum, statsData] = await Promise.all([
+      pCompanies, pPrices, pIndMap, pIndSum, pStats
     ]);
+
+    // ✅ 4. İstatistikleri Global Değişkene Ata
+    window.__SCREENER_STATS_CACHE = statsData || {};
+    console.log("[Data] İstatistik dosyası yüklendi.");
+
+    // ... (Mevcut kodların geri kalanı AYNI kalsın: indicators, companies, prices işleme) ...
+    // ...
+    // (Aşağıdaki kısımları bozmadan koruyun)
 
     if (resIndMap.ok) window.__INDICATORS_MAP = await resIndMap.json();
     if (resIndSum.ok) {
       const s = await resIndSum.json();
-      if (Array.isArray(s)) {
-        window.__INDICATORS_SUMMARY = {
-          asOf: null,
-          items: s
-        };
-      } else {
-        window.__INDICATORS_SUMMARY = {
-          asOf: s?.asOf || null,
-          items: Array.isArray(s?.items) ? s.items : []
-        };
-      }
+      window.__INDICATORS_SUMMARY = Array.isArray(s) ? { asOf: null, items: s } : { asOf: s?.asOf, items: s?.items || [] };
     }
-
     window.__INDICATORS_LAST = {};
 
     if (resComp.ok) {
@@ -129,6 +139,8 @@ async function loadFinapsisData() {
     window.currentPriceData = window.currentPriceData || {};
   }
 }
+
+// ... (Dosyanın geri kalanı aynı) ...
 
 // Global Varsayılanlar
 window.__CALENDAR_LIST_RAW = window.__CALENDAR_LIST_RAW || `[]`;
