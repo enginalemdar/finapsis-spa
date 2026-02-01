@@ -1,0 +1,97 @@
+<div class="wrap">
+    <div class="cal-filter-bar">
+        <div class="cal-filter-group">
+            <button class="cal-pill active" onclick="calListSetTime('today', this)">Bugün</button>
+            <button class="cal-pill" onclick="calListSetTime('tomorrow', this)">Yarın</button>
+            <button class="cal-pill" onclick="calListSetTime('yesterday', this)">Dün</button>
+            <button class="cal-pill" onclick="calListSetTime('this-week', this)">Bu Hafta</button>
+            <button class="cal-pill" onclick="calListSetTime('next-week', this)">Gelecek Hafta</button>
+            <button class="cal-pill" onclick="calListSetTime('prev-week', this)">Geçen Hafta</button>
+            <button class="cal-pill" onclick="calListSetTime('this-month', this)">Bu Ay</button>
+            <button class="cal-pill" onclick="calListSetTime('next-month', this)">Gelecek Ay</button>
+            <button class="cal-pill" onclick="calListSetTime('prev-month', this)">Geçen Ay</button>
+        </div>
+
+        <div class="cal-filter-group">
+            <button class="cal-icon-btn" onclick="calListToggleFilter('region', 'tr', this)" title="Türkiye">
+                <img src="https://flagcdn.com/w40/tr.png">
+            </button>
+            <button class="cal-icon-btn" onclick="calListToggleFilter('region', 'us', this)" title="ABD">
+                <img src="https://flagcdn.com/w40/us.png">
+            </button>
+            <button class="cal-icon-btn" onclick="calListToggleFilter('region', 'eu', this)" title="Euro Bölgesi">
+                <img src="https://flagcdn.com/w40/eu.png">
+            </button>
+        </div>
+
+        <div class="cal-filter-group" style="padding-left:8px;">
+            <div class="cal-impact-rating" id="calImpactFilter" data-level="1" title="Etki Seviyesi Seç">
+                <svg class="cal-impact-item" viewBox="0 0 24 24" onclick="calListSetImpact(1, event)">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                <svg class="cal-impact-item" viewBox="0 0 24 24" onclick="calListSetImpact(2, event)">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                <svg class="cal-impact-item" viewBox="0 0 24 24" onclick="calListSetImpact(3, event)">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="cal-search-wrap">
+            <i class="fa-solid fa-search cal-search-icon"></i>
+            <input type="text" class="cal-search-input" placeholder="Etkinlik ara..." oninput="calListSearch(this.value)">
+        </div>
+    </div>
+    <div id="calAsOf" style="margin: -10px 0 12px 0; color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 700;">
+        Son güncelleme: -
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Ekonomik Gösterge</th>
+            <th>Etki</th>
+            <th>Beklenen</th>
+            <th>Gerçekleşen</th>
+            <th>Önceki</th>
+            <th>Hatırlat</th>
+          </tr>
+        </thead>
+        <tbody id="calendar-list-tbody"></tbody>
+      </table>
+    </div>
+</div>
+
+<div id="calListModalOverlay" class="modal-overlay">
+  <div id="calListModalContent" class="modal-content">
+    <div id="calFormContainer">
+      <div class="modal-title">Etkinlik Hatırlatıcı</div>
+      <div class="input-group">
+        <label>Ad Soyad</label>
+        <input type="text" id="calUserName" placeholder="Adınız Soyadınız">
+      </div>
+      <div class="input-group">
+        <label>E-posta Adresi</label>
+        <input type="email" id="calUserEmail" placeholder="ornek@mail.com">
+      </div>
+      <div class="check-group">
+        <input type="checkbox" id="calCheckConsent">
+        <label for="calCheckConsent">Bilgilerimin kaydedilmesine ve işlenmesine izin veriyorum.</label>
+      </div>
+      <div class="check-group">
+        <input type="checkbox" id="calCheckNews">
+        <label for="calCheckNews">Finapsis gelişmelerinden haberdar olmak istiyorum.</label>
+      </div>
+      <button id="calSendBtn" class="submit-btn" disabled>Beni Bilgilendir</button>
+      <button onclick="calCloseListModal()" style="background:none; border:none; color:#aaa; width:100%; margin-top:10px; font-size:12px; cursor:pointer;">Vazgeç</button>
+    </div>
+
+    <div id="calSuccessContainer" style="display:none; text-align:center; padding: 20px 0;">
+      <div style="font-size: 50px; color: #c2f50e; margin-bottom: 15px;">✓</div>
+      <div class="modal-title" style="margin-bottom: 8px;">Hatırlatıcı Oluşturuldu!</div>
+      <p style="color: #aaa; font-size: 14px;">Etkinlik gerçekleştiğinde size mail göndereceğiz.</p>
+    </div>
+  </div>
+</div>

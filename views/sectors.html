@@ -1,0 +1,52 @@
+<div class="wrap sec-wrap" style="flex-direction:column;">
+    <div class="sec-toolbar">
+        <div id="secBadgeArea" class="sc-badge-area" style="padding:0; min-height:auto; margin:0;"></div>
+
+        <div class="sec-search-box">
+            <i class="fa-solid fa-magnifying-glass sec-search-icon"></i>
+            <input type="text" id="secSearchCompany" class="sec-search-input" 
+                   placeholder="Şirket ara (örn: THYAO)..." 
+                   oninput="secFindSectorByCompany(this.value)">
+        </div>
+
+        <div class="sec-search-box">
+            <i class="fa-solid fa-filter sec-search-icon"></i>
+            <input type="text" id="secSearchName" class="sec-search-input" 
+                   placeholder="Sektör filtrele..." 
+                   oninput="secFilterTable(this.value)">
+        </div>
+    </div>
+    
+    <div class="table-wrapper" id="sec-height-wrapper">
+      <table>
+        <thead id="sec-thead">
+          <tr>
+            <th data-key="name" style="display:flex; align-items:center; gap:8px;">
+                <i id="secMasterCaret" class="fa-solid fa-chevron-right sec-caret" 
+                   style="cursor:pointer; width:16px; text-align:center;" 
+                   onclick="secToggleAllRows(event)"></i>
+                <span>Sektör / Şirket</span>
+            </th>
+            <th data-key="Piyasa Değeri">Piyasa Değeri</th>
+            <th data-key="Firma Değeri">Firma Değeri</th>
+            <th data-key="Brüt Kar Marjı">Brüt Kar Marjı</th>
+            <th data-key="Faaliyet Kâr Marjı">Faaliyet Marjı</th>
+            <th data-key="Cari Oran">Cari Oran</th>
+            <th data-key="Asit Test Oranı">Asit Test Oranı</th>
+            <th data-key="Borç/Öz Kaynak">Borç/Özkaynak</th>
+            <th data-key="Nakit Döngüsü">Nakit Döngüsü</th>
+            <th data-key="Stok Devir Hızı">Stok Devir Hızı</th>
+            <th data-key="Stok Süresi">Stok Süresi</th>
+            <th data-key="Alacak Devir Hızı">Alacak Devir Hızı</th>
+            <th data-key="Alacak Süresi">Alacak Süresi</th>
+            <th data-key="Borç Devir Hızı">Borç Devir Hızı</th>
+            <th data-key="Borç Süresi">Borç Süresi</th>
+            <th data-key="ROIC">ROIC</th>
+            <th data-key="ROA">ROA</th>
+            <th data-key="ROE">ROE</th>
+          </tr>
+        </thead>
+        <tbody id="sec-tbody"></tbody>
+      </table>
+    </div>
+</div>

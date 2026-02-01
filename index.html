@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=0">
+  <title>Finapsis - Ultimate Suite</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div id="preloader"><div class="spinner"></div></div>
+
+  <nav class="app-tabs">
+    <button class="tab-btn active" onclick="switchTab('screener.html')">Skorlama</button>
+    <button class="tab-btn" onclick="switchTab('companieslist.html')">Şirketler</button>
+    <button class="tab-btn" onclick="switchTab('sectors')">Sektörler</button>
+    <button class="tab-btn" onclick="switchTab('diagrams')">Diyagramlar</button>
+    <button class="tab-btn" onclick="switchTab('karsilastirma.html')">Karşılaştırma</button>
+    <button class="tab-btn" onclick="switchTab('portfolio.html')">Portföy</button>
+    <button class="tab-btn" onclick="switchTab('detail')">Varlık Detay</button>
+    <button class="tab-btn" onclick="switchTab('indicators')">Göstergeler</button>
+    <button class="tab-btn" onclick="switchTab('calendarlist')">Takvim</button>
+    <button class="tab-btn" onclick="switchTab('news')">Haberler</button>
+  </nav>
+
+  <div class="sub-tabs-container">
+      </div>
+
+  <div id="view-screener" class="view-section active">
+      </div>
+
+  <div id="view-companies" class="view-section">
+      </div>
+
+  <div id="view-sectors" class="view-section">
+      </div>
+
+  <div id="view-diagrams" class="view-section">
+      </div>
+
+  <div id="view-compare" class="view-section">
+      </div>
+
+  <div id="view-portfolio" class="view-section">
+      </div>
+
+  <div id="view-detail" class="view-section">
+      </div>
+
+  <div id="view-indicators" class="view-section">
+      </div>
+
+  <div id="view-calendar-list" class="view-section">
+      </div>
+
+  <div id="view-news" class="view-section">
+      </div>
+
+  <div id="fpRowMenuOverlay" onclick="fpCloseRowMenu()">
+    <div id="fpRowMenu" onclick="event.stopPropagation()">
+      <div class="fpMenuHead">
+        <div class="fpMenuTitle">İşlemler • <span id="fpMenuTicker" class="fpMenuTicker">-</span></div>
+        <div class="fpMenuClose" onclick="fpCloseRowMenu()"><i class="fa-solid fa-xmark"></i></div>
+      </div>
+      <div class="fpMenuItem" id="fpMenuDetail">
+        <div class="fpMenuIcon"><i class="fa-solid fa-arrow-up-right-from-square"></i></div> Detaya Git
+      </div>
+      <div class="fpMenuItem" id="fpMenuBuy">
+        <div class="fpMenuIcon"><i class="fa-solid fa-cart-shopping"></i></div> Al
+      </div>
+      <div class="fpMenuItem" id="fpMenuSell">
+        <div class="fpMenuIcon"><i class="fa-solid fa-right-left"></i></div> Sat
+      </div>
+      <div class="fpMenuItem" id="fpMenuWatch">
+        <div class="fpMenuIcon"><i class="fa-solid fa-eye"></i></div> İzle
+      </div>
+    </div>
+  </div>
+
+  <script src="js/global.js"></script>
+  <script src="js/screener.js"></script>
+  <script src="js/companies.js"></script>
+  <script src="js/sectors.js"></script>
+  <script src="js/diagrams.js"></script>
+  <script src="js/compare.js"></script>
+  <script src="js/portfolio.js"></script>
+  <script src="js/detail.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/news.js"></script>
+
+</body>
+</html>
