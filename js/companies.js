@@ -115,7 +115,10 @@ function renderCompanyList() {
   __clAppendRequested = false;
 
   if (!append) {
-    tbody.innerHTML = "";
+    tbody.innerHTML = `<tr><td colspan="23" style="text-align:center; padding:60px 20px; color:rgba(255,255,255,0.35);">
+      <div class="spinner" style="margin:0 auto 12px auto; width:28px; height:28px;"></div>
+      Veriler Yükleniyor...
+    </td></tr>`;
     __clRenderedCount = 0;
     __clLastKey = key;
   }
@@ -185,10 +188,15 @@ function renderCompanyList() {
   const token = window.__clRenderToken;
 
   let i = __clRenderedCount;
-  const BATCH = 70;
+  const BATCH = 30;
 
   function pump(){
     if (token !== window.__clRenderToken) return;
+
+    // İlk batch başlangıcında loader'ı temizle
+    if (i === 0 && tbody.querySelector('td[colspan]')) {
+      tbody.innerHTML = "";
+    }
 
     const frag = document.createDocumentFragment();
     const end = Math.min(i + BATCH, filtered.length);
@@ -221,11 +229,9 @@ function renderCompanyList() {
       tr.innerHTML = `
         <td>
           <div style="display:flex; align-items:center; gap:12px;">
-            <img src="${c.logourl}" loading="lazy" decoding="async" fetchpriority="low"
-                 style="width:32px; height:32px; object-fit:contain; background:#111; border-radius:6px; flex-shrink: 0;"
-                 onerror="this.style.display='none'">
+            <img src="${c.logourl}" loading="lazy" style="width:32px; height:32px; object-fit:contain; background:#111; border-radius:6px; flex-shrink: 0;" onerror="this.style.display='none'">
             <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden;">
-              <a href="https://finapsis.co/comdetail/${c.slug}" target="_top" style="font-weight:600; font-size:14px; color:#fff; text-decoration:none;">${c.name}</a>
+              <a href="#" onclick="event.preventDefault(); window.__detailTicker='${c.ticker}'; switchTab('detail');" style="font-weight:600; font-size:14px; color:#fff; text-decoration:none; cursor:pointer;">${c.name}</a>
               <div style="font-size:11px; color:#666;">${c.ticker} • ${c.sector}</div>
             </div>
             <button class="fp-menu-btn" title="İşlemler" onclick="event.stopPropagation(); fpOpenRowMenu('${c.ticker}', event)">
