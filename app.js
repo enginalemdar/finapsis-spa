@@ -7113,13 +7113,28 @@ document.addEventListener("DOMContentLoaded", async function() {
         cmpSaveSelection(activeGroup);
       }
 
-      function cmpUpdateHeight() {
-        try {
-          const root = document.getElementById('cmpHeightWrapper') || document.getElementById('view-compare');
-          const h = Math.max(600, Math.ceil((root && root.scrollHeight) ? root.scrollHeight : 800) + 20);
-          if(window.parent) window.parent.postMessage({ type: 'resize-iframe', height: h }, '*');
-        } catch(e) {}
-      }
+      // ✅ Compare iframe height: küçülmeyi engelle (feedback loop fix)
+let __cmpLastSentH = 0;
+
+function cmpUpdateHeight(force = false) {
+  try {
+    // Compare ekranı kendi içinde scroll ediyor (cmp-table-wrapper).
+    // Bu yüzden "content scrollHeight" ile iframe küçültmek yerine
+    // güvenli bir minimum + viewport bazlı bir yükseklik gönderiyoruz.
+    const base = Math.max(900, Math.ceil((window.innerHeight || 800) + 60));
+
+    // küçültme yapma (sadece büyüt / ilk sefer zorla)
+    if (!force && base <= __cmpLastSentH) return;
+
+    __cmpLastSentH = base;
+
+    (window.parent || window.top).postMessage(
+      { type: "resize-iframe", height: base },
+      "*"
+    );
+  } catch (e) {}
+}
+
 
       // --- SEARCH LOGIC (FIXED) ---
       function cmpInitSearch() {
