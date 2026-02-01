@@ -188,13 +188,13 @@ function renderCompanyList() {
   const token = window.__clRenderToken;
 
   let i = __clRenderedCount;
-  const BATCH = 30;
+  const BATCH = 25;
 
   function pump(){
     if (token !== window.__clRenderToken) return;
 
-    // İlk batch başlangıcında loader'ı temizle
-    if (i === 0 && tbody.querySelector('td[colspan]')) {
+    // İlk batch: loader'ı temizle
+    if (i === 0) {
       tbody.innerHTML = "";
     }
 
@@ -231,7 +231,7 @@ function renderCompanyList() {
           <div style="display:flex; align-items:center; gap:12px;">
             <img src="${c.logourl}" loading="lazy" style="width:32px; height:32px; object-fit:contain; background:#111; border-radius:6px; flex-shrink: 0;" onerror="this.style.display='none'">
             <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden;">
-              <a href="#" onclick="event.preventDefault(); window.__detailTicker='${c.ticker}'; switchTab('detail');" style="font-weight:600; font-size:14px; color:#fff; text-decoration:none; cursor:pointer;">${c.name}</a>
+              <a href="#" onclick="event.preventDefault(); localStorage.setItem('finapsis_detail_ticker','${c.ticker}'); switchTab('detail');" style="font-weight:600; font-size:14px; color:#fff; text-decoration:none; cursor:pointer;">${c.name}</a>
               <div style="font-size:11px; color:#666;">${c.ticker} • ${c.sector}</div>
             </div>
             <button class="fp-menu-btn" title="İşlemler" onclick="event.stopPropagation(); fpOpenRowMenu('${c.ticker}', event)">
@@ -275,16 +275,18 @@ function renderCompanyList() {
 
     tbody.appendChild(frag);
 
-    if (i % (BATCH*3) === 0) window.pfFinapsisResize?.();
-
-    if (i < filtered.length) requestAnimationFrame(pump);
-    else {
+    if (i < filtered.length) {
+      // setTimeout ile ana thread'e nefes ver - scroll takılmayı önler
+      setTimeout(pump, 0);
+    } else {
       __clRenderedCount = filtered.length; 
       window.pfFinapsisResize?.();
+      clSetupInfiniteScroll();
     }
   }
 
-  requestAnimationFrame(pump);
+  // İlk batch hemen çalış
+  pump();
 }
 
 window.clCloseSectorPopup = function(e){
