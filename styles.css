@@ -514,6 +514,8 @@ nav.app-tabs .tab-btn.active {
   flex: 1;
   min-height: 0;
   gap: 10px;
+  display: flex;
+  flex-direction: column;
 }
 
 #view-companies .top-controls {
@@ -591,7 +593,7 @@ nav.app-tabs .tab-btn.active {
 }
 
 #view-companies tbody tr {
-  height: 50px;
+  height: 56px;
 }
 
 #view-companies tbody td {
@@ -4644,6 +4646,13 @@ tr.sec-row-level-3:hover td {
 .cl-popup-item.selected {
   color: #c2f50e;
   background: rgba(194, 245, 14, 0.05);
+}
+
+/* Input number spinner gizle */
+#clPopup_filter input[type=number]::-webkit-outer-spin-button,
+#clPopup_filter input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* --- SECTORS TREE VIEW --- */
