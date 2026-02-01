@@ -205,6 +205,10 @@ function hidePreloader() {
 }
 
 function updateScreenerLoadingState(isLoading) {
+    // Sadece screener tab aktif olunca loader göster
+    const screenerView = document.getElementById('view-screener');
+    if (!screenerView || !screenerView.classList.contains('active')) return;
+
     const tbody = document.getElementById('screener-results-body');
     if (!tbody) return;
 
