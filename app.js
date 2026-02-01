@@ -1,8 +1,3 @@
-(function () {
-  const s = window.__SESSION__ || null;
-  console.log("[SESSION]", s);
-})();
-
 // --- ORTAK GLOBAL VERİLER & SABİTLER ---
     // Şirket veri yapısı örn: { ticker, name, group: "bist"|"sp"|"doviz"|"emtia"|"kripto", logourl, slug, unit }
 // --- CLOUDFLARE DATA URL ---
@@ -682,16 +677,17 @@ function fpEnsureInit(tabName){
     try { initCompaniesList(); } catch(e) {}
   }
 }
-
 function finGetPlan() {
   try {
-    const p = new URLSearchParams(location.search).get("plan");
-    if (p) return String(p).toLowerCase();
+    // Bubble’dan gelen session öncelikli
+    const s = window.__SESSION__ || null;
+    if (s?.plan) return String(s.plan).toLowerCase();
   } catch (e) {}
 
   try {
-    const s = window.__SESSION__ || null;
-    if (s?.plan) return String(s.plan).toLowerCase();
+    // Test için query param destek
+    const p = new URLSearchParams(location.search).get("plan");
+    if (p) return String(p).toLowerCase();
   } catch (e) {}
 
   return "free";
@@ -702,16 +698,15 @@ function finIsFree() {
 }
 
 function finPaywall(msg) {
-  // şimdilik basit; istersek sonra güzel modal yaparız
   alert(msg || "Bu özellik Pro üyelik gerektirir.");
 }
 
 
     function switchTab(tabName) {
-        // ✅ Free kullanıcı Skorlama'yı açamasın
+        // ✅ Free kullanıcı Skorlama'ya girmesin (kilitli)
   if (finIsFree() && String(tabName || "") === "screener.html") {
-    finPaywall("Skorlama ekranı Pro üyelik gerektirir.");
-    tabName = "companieslist.html"; // free için güvenli fallback
+    finPaywall("Skorlama (Screener) Pro üyelik gerektirir.");
+    return; // hiçbir yere geçme
   }
 
       if(typeof finEnsureCompanies === "function") finEnsureCompanies();
@@ -6397,9 +6392,26 @@ document.addEventListener("DOMContentLoaded", async function() {
     else if (saved) target = saved;
 
     setTimeout(() => {
+        // ✅ Free ise Skorlama hedeflenmişse Companies'e düş
+        if (finIsFree() && target === "screener.html") target = "companieslist.html";
+
+        // ✅ Free ise Skorlama tab butonuna kilit görünümü ver
+        if (finIsFree()) {
+          const scrBtn =
+            document.querySelector('nav.app-tabs .tab-btn[data-tab="screener.html"]') ||
+            Array.from(document.querySelectorAll("nav.app-tabs .tab-btn")).find(b => (b.getAttribute("onclick") || "").includes("screener.html"));
+
+          if (scrBtn) {
+            scrBtn.classList.add("locked");
+            scrBtn.title = "Pro üyelik gerektirir";
+            scrBtn.classList.remove("active");
+          }
+        }
+
         switchTab(target);
         requestAnimationFrame(hidePL);
     }, 10);
+
 
   } catch(e) {
     requestAnimationFrame(hidePL);
@@ -8929,21 +8941,3 @@ async function fetchLatestTickerNews(ticker){
       return [];
   }
 }
-document.addEventListener("DOMContentLoaded", () => {
-  if (!finIsFree()) return;
-
-  // Skorlama tabını gizle
-  const btns = document.querySelectorAll("nav.app-tabs .tab-btn");
-  btns.forEach((b) => {
-    const oc = (b.getAttribute("onclick") || "");
-    if (oc.includes("screener.html")) b.style.display = "none";
-  });
-
-  // Eğer sayfa ilk açılışta Skorlama'daysa, otomatik Şirketler'e at
-  try {
-    const active = localStorage.getItem("finapsis_active_main_tab");
-    if (active === "screener.html") {
-      localStorage.setItem("finapsis_active_main_tab", "companieslist.html");
-    }
-  } catch(e) {}
-});
