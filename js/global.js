@@ -352,13 +352,23 @@ async function finBuildMapForActiveGroup(done) {
         return;
     }
     
+    const g = String(window.activeGroup || "bist");
+
+    // ✅ GRUP CACHE KONTROLÜ - Zaten indirildiyse tekrar indirme
+    window.__FIN_GROUP_CACHE = window.__FIN_GROUP_CACHE || {};
+    if (window.__FIN_GROUP_CACHE[g]) {
+        console.log(`⚡ [METRICS] ${g} cache'den yükleniyor (fetch yok)`);
+        window.isFinDataReady = true;
+        // Bekleyen waiters'ı çalıştır
+        const q = (window.__FIN_METRICS_WAITERS || []).splice(0);
+        setTimeout(() => { q.forEach(fn => { try { fn(); } catch (e) {} }); }, 0);
+        return;
+    }
+    
     __loadingMetrics = true;
     window.isFinDataReady = false; 
 
-    // UI: Yükleniyor Göster
     updateScreenerLoadingState(true);
-
-    const g = String(window.activeGroup || "bist");
     console.log(`📦 [METRICS] Aktif grup: ${g}`);
     
     window.__FIN_MAP = window.__FIN_MAP || {};
@@ -544,6 +554,11 @@ async function finBuildMapForActiveGroup(done) {
     } finally {
         __loadingMetrics = false;
         window.isFinDataReady = true; 
+        
+        // ✅ Grup cache'e kaydet - bir kere indirildikten sonra tekrar fetch etme
+        window.__FIN_GROUP_CACHE[g] = true;
+        console.log(`✅ [METRICS] ${g} cache'e kaydedildi`);
+        
         updateScreenerLoadingState(false);
 
         // Bekleyen işleri çalıştır
@@ -828,15 +843,19 @@ function setGroup(group) {
   try {
     if (typeof finBuildMapForActiveGroup === "function") {
       finBuildMapForActiveGroup(() => {
-        try { if (typeof initScreener === "function") initScreener(); } catch (e) { console.error(e); }
-        try { scUpdateFilterBadges(); } catch (e) {}
-        try { if (typeof clBindHeaderSortOnce === "function") clBindHeaderSortOnce(); } catch (e) {}
-        try { if (typeof clUpdateSortHeaderUI === "function") clUpdateSortHeaderUI(); } catch (e) {}
-        try { if (typeof renderCompanyList === "function") renderCompanyList(); } catch (e) {}
-        try { if (window.secRenderTable) window.secRenderTable(); } catch (e) {}
-        try { if (window.dgRender) window.dgRender(); } catch (e) {}
-        try { if (window.cmpRender) window.cmpRender(); } catch (e) {}
-        try { clSetupInfiniteScroll(); } catch (e) {}
+        // Sadece aktif tab'ın render'ını çağır
+        const activeTab = localStorage.getItem('finapsis_active_main_tab') || 'screener.html';
+        console.log(`🎯 [setGroup] Aktif tab render: ${activeTab}`);
+        
+        setTimeout(() => {
+          try {
+            if (activeTab === 'screener.html' && typeof initScreener === "function") initScreener();
+            else if (activeTab === 'companieslist.html' && typeof renderCompanyList === "function") renderCompanyList();
+            else if (activeTab === 'sectors' && window.secRenderTable) window.secRenderTable();
+            else if (activeTab === 'karsilastirma.html' && window.cmpRender) window.cmpRender();
+            else if (activeTab === 'diagrams' && window.dgRender) window.dgRender();
+          } catch(e) { console.error(e); }
+        }, 0);
       });
     }
   } catch (e) {
