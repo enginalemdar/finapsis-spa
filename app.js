@@ -683,7 +683,37 @@ function fpEnsureInit(tabName){
   }
 }
 
+function finGetPlan() {
+  try {
+    const p = new URLSearchParams(location.search).get("plan");
+    if (p) return String(p).toLowerCase();
+  } catch (e) {}
+
+  try {
+    const s = window.__SESSION__ || null;
+    if (s?.plan) return String(s.plan).toLowerCase();
+  } catch (e) {}
+
+  return "free";
+}
+
+function finIsFree() {
+  return finGetPlan() === "free";
+}
+
+function finPaywall(msg) {
+  // şimdilik basit; istersek sonra güzel modal yaparız
+  alert(msg || "Bu özellik Pro üyelik gerektirir.");
+}
+
+
     function switchTab(tabName) {
+        // ✅ Free kullanıcı Skorlama'yı açamasın
+  if (finIsFree() && String(tabName || "") === "screener.html") {
+    finPaywall("Skorlama ekranı Pro üyelik gerektirir.");
+    tabName = "companieslist.html"; // free için güvenli fallback
+  }
+
       if(typeof finEnsureCompanies === "function") finEnsureCompanies();
         if(typeof finEnsureBenchmarks === "function") finEnsureBenchmarks();
         if(typeof finEnsureIndicators === "function") finEnsureIndicators();
@@ -8899,3 +8929,21 @@ async function fetchLatestTickerNews(ticker){
       return [];
   }
 }
+document.addEventListener("DOMContentLoaded", () => {
+  if (!finIsFree()) return;
+
+  // Skorlama tabını gizle
+  const btns = document.querySelectorAll("nav.app-tabs .tab-btn");
+  btns.forEach((b) => {
+    const oc = (b.getAttribute("onclick") || "");
+    if (oc.includes("screener.html")) b.style.display = "none";
+  });
+
+  // Eğer sayfa ilk açılışta Skorlama'daysa, otomatik Şirketler'e at
+  try {
+    const active = localStorage.getItem("finapsis_active_main_tab");
+    if (active === "screener.html") {
+      localStorage.setItem("finapsis_active_main_tab", "companieslist.html");
+    }
+  } catch(e) {}
+});
