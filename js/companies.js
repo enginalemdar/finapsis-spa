@@ -120,33 +120,42 @@ function renderCompanyList() {
     __clLastKey = key;
   }
 
+  const searchQuery = String(activeFilters.name || "").toLocaleLowerCase('tr').trim();
+  const isGlobalSearch = searchQuery.length > 0;
+
   let filtered = window.companies.filter(c => {
-      if(c.group !== window.activeGroup) return false;
+      // Search varsa global ara, yoksa aktif grup
+      if (!isGlobalSearch && c.group !== window.activeGroup) return false;
+      // Global search'te sadece ana borsa gruplarını dahil et
+      if (isGlobalSearch && !['bist','nyse','nasdaq'].includes(c.group)) return false;
 
-      if (window.clFilters && window.clFilters.sector) {
-          if (c.sector !== window.clFilters.sector) return false;
-      }
-
-      if (window.clFilters && window.clFilters.industry) {
-          if (c.industry !== window.clFilters.industry) return false;
+      // Sektör/industry filtre: sadece aktif grup için
+      if (!isGlobalSearch) {
+        if (window.clFilters && window.clFilters.sector) {
+            if (c.sector !== window.clFilters.sector) return false;
+        }
+        if (window.clFilters && window.clFilters.industry) {
+            if (c.industry !== window.clFilters.industry) return false;
+        }
       }
 
       const d = map[c.ticker] || {};
       
-      const q = String(activeFilters.name || "").toLocaleLowerCase('tr').trim();
       const nm = String(c.name || "").toLocaleLowerCase('tr');
       const tk = String(c.ticker || "").toLocaleLowerCase('tr');
 
-      const matchName = (q.length < 1) ? true : (nm.includes(q) || tk.includes(q));
+      const matchName = (searchQuery.length < 1) ? true : (nm.includes(searchQuery) || tk.includes(searchQuery));
       const matchSector = activeFilters.sector === "" || c.sector === activeFilters.sector;
       let matchRanges = true;
-      for (let key in activeFilters.ranges) {
-          const val = d[key]; const range = activeFilters.ranges[key];
-          let compareVal = val;
-          if (key.includes("Değeri") && val) compareVal = val / 1_000_000;
-          else if ((key.includes("Marjı") || key.includes("RO")) && val) compareVal = val * 100;
-          if (range.min !== null && (val === null || compareVal < range.min)) matchRanges = false;
-          if (range.max !== null && (val === null || compareVal > range.max)) matchRanges = false;
+      if (!isGlobalSearch) {
+        for (let key in activeFilters.ranges) {
+            const val = d[key]; const range = activeFilters.ranges[key];
+            let compareVal = val;
+            if (key.includes("Değeri") && val) compareVal = val / 1_000_000;
+            else if ((key.includes("Marjı") || key.includes("RO")) && val) compareVal = val * 100;
+            if (range.min !== null && (val === null || compareVal < range.min)) matchRanges = false;
+            if (range.max !== null && (val === null || compareVal > range.max)) matchRanges = false;
+        }
       }
       return matchName && matchSector && matchRanges;
   });
@@ -184,12 +193,16 @@ function renderCompanyList() {
   }
 
   // Şirket sayısı badge'i güncelle
-  const totalInGroup = (window.companies || []).filter(c => c.group === window.activeGroup).length;
   const countEl = document.getElementById('cl-count');
   if (countEl) {
-    countEl.textContent = filteredTotal < totalInGroup
-      ? `${filteredTotal.toLocaleString('tr-TR')} / ${totalInGroup.toLocaleString('tr-TR')} şirket`
-      : `${totalInGroup.toLocaleString('tr-TR')} şirket`;
+    if (isGlobalSearch) {
+      countEl.textContent = `${filteredTotal.toLocaleString('tr-TR')} sonuç`;
+    } else {
+      const totalInGroup = (window.companies || []).filter(c => c.group === window.activeGroup).length;
+      countEl.textContent = filteredTotal < totalInGroup
+        ? `${filteredTotal.toLocaleString('tr-TR')} / ${totalInGroup.toLocaleString('tr-TR')} şirket`
+        : `${totalInGroup.toLocaleString('tr-TR')} şirket`;
+    }
   }
 
   window.__clRenderToken = (window.__clRenderToken || 0) + 1;
@@ -241,7 +254,7 @@ function renderCompanyList() {
             <img src="${c.logourl}" loading="lazy" style="width:32px; height:32px; object-fit:contain; background:#111; border-radius:6px; flex-shrink: 0;" onerror="this.style.display='none'">
             <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden;">
               <a href="#" onclick="event.preventDefault(); if(window.finOpenDetail) window.finOpenDetail('${c.ticker}'); else { localStorage.setItem('finapsis_detail_ticker','${c.ticker}'); switchTab('detail'); }" style="font-weight:600; font-size:14px; color:#fff; text-decoration:none; cursor:pointer;">${c.name}</a>
-              <div style="font-size:11px; color:#666;">${c.ticker} • ${c.sector === '#N/A' ? '-' : c.sector}</div>
+              <div style="font-size:11px; color:#666;">${c.ticker} • ${c.sector === '#N/A' ? '-' : c.sector}${isGlobalSearch ? ` <span style="color:#c2f50e; font-weight:700; margin-left:4px;">${c.group.toUpperCase()}</span>` : ''}</div>
             </div>
             <button class="fp-menu-btn" title="İşlemler" onclick="event.stopPropagation(); fpOpenRowMenu('${c.ticker}', event)">
               <i class="fa-solid fa-ellipsis-vertical"></i>
@@ -510,6 +523,50 @@ window.clUpdateFilterBadges = function() {
         </div>
     `;
 
+    // Aktif range filter var mı kontrol
+    const hasActiveRange = Object.keys(activeFilters.ranges || {}).some(k => {
+      const r = activeFilters.ranges[k];
+      return (r && (r.min !== null || r.max !== null));
+    });
+
+    html += `
+        <div style="position:relative;">
+            <div class="cl-badge ${hasActiveRange ? 'active' : ''}" onclick="clTogglePopup('filter', event)">
+                <i class="fa-solid fa-sliders"></i>
+                FİLTRE
+                ${hasActiveRange ? '<i class="fa-solid fa-xmark" onclick="clClearAllRanges(event)" style="opacity:0.6;"></i>' : '<i class="fa-solid fa-chevron-down" style="font-size:10px; opacity:0.5;"></i>'}
+            </div>
+            <div id="clPopup_filter" class="cl-popup-menu" style="width:320px; max-height:460px; overflow-y:auto;" onclick="event.stopPropagation()">
+                <div style="padding:12px 14px 6px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:11px; font-weight:800; color:#fff; text-transform:uppercase; letter-spacing:0.5px;">Detaylı Filtre</span>
+                    <button onclick="clClearAllRanges(event)" style="background:none; border:none; color:#c2f50e; font-size:11px; font-weight:700; cursor:pointer; padding:0;">Temizle</button>
+                </div>
+                ${clBuildFilterGroup('Değerleme', [
+                    {key:'Piyasa Değeri', label:'Piyasa Değeri', unit:'Mn ₺'},
+                    {key:'Firma Değeri', label:'Firma Değeri', unit:'Mn ₺'},
+                    {key:'PD/DD', label:'PD/DD', unit:''},
+                    {key:'F/K', label:'F/K', unit:''}
+                ])}
+                ${clBuildFilterGroup('Gelir & Kar', [
+                    {key:'Satış Gelirleri', label:'Gelirler', unit:'Mn ₺'},
+                    {key:'Brüt Kar Marjı', label:'Brüt Kar Marjı', unit:'%'},
+                    {key:'Faaliyet Kâr Marjı', label:'Faaliyet Kar Marjı', unit:'%'}
+                ])}
+                ${clBuildFilterGroup('Verimlilik', [
+                    {key:'ROIC', label:'ROIC', unit:'%'},
+                    {key:'ROE', label:'ROE', unit:'%'}
+                ])}
+                ${clBuildFilterGroup('Finansal Sağlık', [
+                    {key:'Cari Oran', label:'Cari Oran', unit:''},
+                    {key:'Borç/Öz Kaynak', label:'Borç/Öz Kaynak', unit:''}
+                ])}
+                <div style="padding:10px 14px 14px;">
+                    <button onclick="clApplyRangeFilter()" style="width:100%; padding:9px; background:#c2f50e; color:#000; border:none; border-radius:8px; font-weight:800; font-size:12px; cursor:pointer;">Uygula</button>
+                </div>
+            </div>
+        </div>
+    `;
+
     area.innerHTML = html;
 };
 
@@ -529,6 +586,11 @@ window.clTogglePopup = function(type, e) {
     if (!isAlreadyOpen) {
         
         if (type === 'market') {
+            targetPopup.style.display = 'block';
+            return;
+        }
+
+        if (type === 'filter') {
             targetPopup.style.display = 'block';
             return;
         }
@@ -594,3 +656,58 @@ window.clFilterPopupList = function(type, term) {
 document.addEventListener('click', () => {
     document.querySelectorAll('.cl-popup-menu').forEach(el => el.style.display = 'none');
 });
+
+// --- Detaylı Filtre Helpers ---
+
+function clBuildFilterGroup(title, metrics) {
+  let html = `<div style="padding:8px 14px 4px;">
+    <span style="font-size:10px; font-weight:800; color:rgba(255,255,255,0.3); text-transform:uppercase; letter-spacing:0.8px;">${title}</span>
+  </div>`;
+
+  metrics.forEach(m => {
+    const cur = activeFilters.ranges[m.key] || {};
+    const minVal = cur.min !== null && cur.min !== undefined ? cur.min : '';
+    const maxVal = cur.max !== null && cur.max !== undefined ? cur.max : '';
+    html += `
+      <div style="padding:4px 14px;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <span style="font-size:11px; color:rgba(255,255,255,0.6); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.label}</span>
+          ${m.unit ? `<span style="font-size:10px; color:rgba(255,255,255,0.25);">${m.unit}</span>` : ''}
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input id="clRange_min_${m.key}" type="number" value="${minVal}" placeholder="Min" style="flex:1; padding:6px 8px; background:#1a1a1a; border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff; font-size:12px; outline:none; -moz-appearance:textfield;" onfocus="this.style.borderColor='rgba(194,245,14,0.4)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
+          <span style="color:rgba(255,255,255,0.25); font-size:11px;">–</span>
+          <input id="clRange_max_${m.key}" type="number" value="${maxVal}" placeholder="Max" style="flex:1; padding:6px 8px; background:#1a1a1a; border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff; font-size:12px; outline:none; -moz-appearance:textfield;" onfocus="this.style.borderColor='rgba(194,245,14,0.4)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
+        </div>
+      </div>
+    `;
+  });
+
+  return html;
+}
+
+window.clApplyRangeFilter = function() {
+  const filterKeys = ["Piyasa Değeri", "Firma Değeri", "Satış Gelirleri", "Cari Oran", "Borç/Öz Kaynak", "Brüt Kar Marjı", "Faaliyet Kâr Marjı", "ROIC", "ROE", "PD/DD", "F/K"];
+  activeFilters.ranges = {};
+  filterKeys.forEach(k => {
+    const minEl = document.getElementById(`clRange_min_${k}`);
+    const maxEl = document.getElementById(`clRange_max_${k}`);
+    const min = minEl && minEl.value !== '' ? parseFloat(minEl.value) : null;
+    const max = maxEl && maxEl.value !== '' ? parseFloat(maxEl.value) : null;
+    if (min !== null || max !== null) {
+      activeFilters.ranges[k] = { min, max };
+    }
+  });
+
+  document.querySelectorAll('.cl-popup-menu').forEach(el => el.style.display = 'none');
+  clUpdateFilterBadges();
+  renderCompanyList();
+};
+
+window.clClearAllRanges = function(e) {
+  if (e) e.stopPropagation();
+  activeFilters.ranges = {};
+  document.querySelectorAll('.cl-popup-menu').forEach(el => el.style.display = 'none');
+  clUpdateFilterBadges();
+  renderCompanyList();
+};
