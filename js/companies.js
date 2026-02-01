@@ -222,12 +222,12 @@ function renderCompanyList() {
           const diff = price - prev;
           const isUp = diff > 0;
           const isDown = diff < 0;
-          const color = isUp ? 'color:#c2f50e;' : (isDown ? 'color:#ff4d4d;' : 'color:#eee;');
+          const colorClass = isUp ? 'val-up' : (isDown ? 'val-down' : '');
           const icon = isUp ? '<i class="fa-solid fa-caret-up"></i>' : (isDown ? '<i class="fa-solid fa-caret-down"></i>' : '');
           const sym = (['sp','nyse','nasdaq','doviz','emtia','kripto'].includes(c.group)) ? '$' : '₺';
 
           priceHtml = `
-              <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; font-weight:700; ${color}">
+              <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; font-weight:700;" class="${colorClass}">
                   ${icon} <span>${sym}${price.toLocaleString("tr-TR", {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
               </div>
           `;
