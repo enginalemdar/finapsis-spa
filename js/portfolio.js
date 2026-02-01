@@ -138,7 +138,7 @@ window.pfRefreshPricesFromProxy = pfRefreshPricesFromProxy;
 
   const isUSD = (ticker) => {
     const item = getItem(ticker);
-    return item && (item.group === 'sp' || item.group === 'emtia' || item.group === 'kripto');
+    return item && (item.group === 'sp' || item.group === 'nasdaq' || item.group === 'nyse' || item.group === 'emtia' || item.group === 'kripto');
   };
 
   const getSym = (ticker) => isUSD(ticker) ? '$' : '₺';
@@ -469,7 +469,10 @@ const filtered = (window.companies || []).filter(c => {
     if (pfNormSector(c.sector) !== sector) return false;
   }
 
-  return (c.ticker.toLowerCase().includes(term) || c.name.toLowerCase().includes(term));
+  const tkr = (c.ticker == null) ? "" : String(c.ticker).toLowerCase();
+const nm  = (c.name == null) ? "" : String(c.name).toLowerCase();
+return (tkr.includes(term) || nm.includes(term));
+
 });
 
     list.innerHTML = filtered.map(c => {
@@ -1277,7 +1280,7 @@ const getDetailUrl = (ticker) => {
   if(!item) return null;
 
   const slug = (item.slug || ticker || "").toString().toLowerCase();
-  const isCompany = (item.group === "bist" || item.group === "sp");
+  const isCompany = (item.group === "bist" || item.group === "sp" || item.group === "nasdaq" || item.group === "nyse");
   const root = isCompany ? "https://finapsis.co/comdetail/" : "https://finapsis.co/itemdetail/";
   return root + encodeURIComponent(slug);
 };
