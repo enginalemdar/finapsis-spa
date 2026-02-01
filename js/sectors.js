@@ -99,10 +99,10 @@ function secParseNumber(v){
   return isNaN(n) ? null : n;
 }
 function secMedian(arr){
-  const values = (arr || []).filter(v => v !== null && v !== undefined).sort((a,b)=>a-b);
-  if (!values.length) return null;
-  const half = Math.floor(values.length / 2);
-  return values.length % 2 === 0 ? (values[half - 1] + values[half]) / 2 : values[half];
+  if (!arr || !arr.length) return null;
+  arr.sort((a,b)=>a-b);
+  const half = Math.floor(arr.length / 2);
+  return arr.length % 2 === 0 ? (arr[half - 1] + arr[half]) / 2 : arr[half];
 }
 function secSum(arr){
   return (arr || []).reduce((acc, curr) => acc + (secParseNumber(curr) || 0), 0);
@@ -134,11 +134,15 @@ window.secRenderTable = function(){
 
     const companies = (window.companies || []).filter(c => c.group === window.activeGroup);
     const tree = {};
+    const compMap = {};  // ticker → company — O(1) lookup için
+    window.__secCompMap = compMap;  // lazy fill için expose
 
     companies.forEach(c => {
         const secName = (c.sector && String(c.sector).trim()) ? c.sector : "Diğer";
         const indName = (c.industry && String(c.industry).trim()) ? c.industry : "Diğer";
         const t = String(c.ticker).toUpperCase();
+
+        compMap[t] = c;  // bir kere kaydet
 
         if (!tree[secName]) tree[secName] = { name: secName, companies: [], industries: {} };
         tree[secName].companies.push(t);
@@ -151,14 +155,26 @@ window.secRenderTable = function(){
         const keys = ["Brüt Kar Marjı","Faaliyet Kâr Marjı","Cari Oran","Asit Test Oranı","Borç/Öz Kaynak",
             "Nakit Döngüsü","Stok Devir Hızı","Stok Süresi","Alacak Devir Hızı","Alacak Süresi",
             "Borç Devir Hızı","Borç Süresi","ROIC","ROA","ROE"];
-        
-        stats["Piyasa Değeri"] = secSum(tickerList.map(t => secMap[t]?.["Piyasa Değeri"] ?? 0));
-        stats["Firma Değeri"]  = secSum(tickerList.map(t => secMap[t]?.["Firma Değeri"] ?? 0));
 
-        keys.forEach(k => {
-            const vals = tickerList.map(t => (secMap[t] ? secMap[t][k] : null));
-            stats[k] = secMedian(vals);
+        // Tek geçişte tüm key'lerin values'ını topla
+        let pdSum = 0, fdSum = 0;
+        const buckets = {};
+        keys.forEach(k => { buckets[k] = []; });
+
+        tickerList.forEach(t => {
+            const d = secMap[t];
+            if (!d) return;
+            pdSum += secParseNumber(d["Piyasa Değeri"]) || 0;
+            fdSum += secParseNumber(d["Firma Değeri"]) || 0;
+            keys.forEach(k => {
+                const v = d[k];
+                if (v !== null && v !== undefined) buckets[k].push(secParseNumber(v));
+            });
         });
+
+        stats["Piyasa Değeri"] = pdSum;
+        stats["Firma Değeri"]  = fdSum;
+        keys.forEach(k => { stats[k] = secMedian(buckets[k]); });
         return stats;
     };
 
@@ -263,38 +279,13 @@ window.secRenderTable = function(){
                 return secSort.asc ? vA - vB : vB - vA;
             });
 
+            // Lazy: sadece data-ticker placeholder TR koy, expand edince doldur
             indNode.tickers.forEach(ticker => {
-                const cData = secMap[ticker] || {};
-                const cInfo = companies.find(x => x.ticker === ticker) || {};
                 const compTr = document.createElement("tr");
                 compTr.className = "sec-row-level-3";
                 compTr.setAttribute("data-parent", indId);
+                compTr.setAttribute("data-lazy", ticker);
                 compTr.style.display = "none";
-                compTr.style.cursor = "pointer";
-                compTr.addEventListener("click", (e) => {
-                  e.stopPropagation();
-                  if (window.finOpenDetail) window.finOpenDetail(ticker);
-                });
-
-                const logoHtml = cInfo.logourl ? `<img src="${cInfo.logourl}" class="sec-comp-logo">` : '';
-                
-                compTr.innerHTML = `
-                  <td>
-                    <div class="sec-cell-inner">
-                      ${logoHtml}
-                      <span>${ticker}</span>
-                      <span class="muted" style="margin-left:6px; font-size:10px;">${cInfo.name || ''}</span>
-                      <span class="sec-row-actions">
-                        <span class="fp-menu-btn" title="İşlemler"
-                              onclick="event.stopPropagation(); fpOpenRowMenu('${ticker}', event);">
-                          <i class="fa-solid fa-ellipsis"></i>
-                        </span>
-                      </span>
-                    </div>
-                  </td>
-                  ${renderRowCells(cData)}
-                `;
-
                 frag.appendChild(compTr);
             });
         });
@@ -372,6 +363,14 @@ window.secFilterTable = function(term){
 
   const matchedRows = [];
   allRows.forEach(row => {
+      // Lazy TR: henüz doldurulmamış level-3 — ticker data-lazy'de
+      const lazyTicker = row.getAttribute("data-lazy");
+      if (lazyTicker) {
+          const cInfo = (window.__secCompMap && window.__secCompMap[lazyTicker]) || {};
+          const searchStr = (lazyTicker + ' ' + (cInfo.name || '')).toLocaleLowerCase('tr');
+          if (searchStr.includes(t)) matchedRows.push(row);
+          return;
+      }
       const nameSpan = row.querySelector(".sec-cell-inner span"); 
       const txt = nameSpan ? nameSpan.textContent.toLocaleLowerCase('tr') : "";
       
@@ -381,6 +380,42 @@ window.secFilterTable = function(term){
   });
 
   matchedRows.forEach(row => {
+      // Lazy level-3 doldurma
+      const lazyTicker = row.getAttribute("data-lazy");
+      if (lazyTicker) {
+          row.removeAttribute("data-lazy");
+          const cData = secMap[lazyTicker] || {};
+          const cInfo = (window.__secCompMap && window.__secCompMap[lazyTicker]) || {};
+          const logoHtml = cInfo.logourl ? `<img src="${cInfo.logourl}" class="sec-comp-logo">` : '';
+          const num = (v) => (v === null || v === undefined) ? `<span class="muted">-</span>` : Number(v).toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+          const pct = (v) => (v === null || v === undefined) ? `<span class="muted">-</span>` : (Number(v) * 100).toFixed(1) + "%";
+          const cls = (v) => (v > 0 ? "pos" : (v < 0 ? "neg" : ""));
+          const money = (v) => (v === null || v === undefined) ? `<span class="muted">-</span>` : finFormatMoneyCompact(v, { decimals: 1 });
+          row.style.cursor = "pointer";
+          row.innerHTML = `
+            <td><div class="sec-cell-inner">
+              ${logoHtml}<span>${lazyTicker}</span>
+              <span class="muted" style="margin-left:6px; font-size:10px;">${cInfo.name || ''}</span>
+              <span class="sec-row-actions"><span class="fp-menu-btn" title="İşlemler" onclick="event.stopPropagation(); fpOpenRowMenu('${lazyTicker}', event);"><i class="fa-solid fa-ellipsis"></i></span></span>
+            </div></td>
+            <td data-label="Piyasa Değeri">${money(cData["Piyasa Değeri"])}</td>
+            <td data-label="Firma Değeri">${money(cData["Firma Değeri"])}</td>
+            <td class="${cls(cData["Brüt Kar Marjı"])}">${pct(cData["Brüt Kar Marjı"])}</td>
+            <td class="${cls(cData["Faaliyet Kâr Marjı"])}">${pct(cData["Faaliyet Kâr Marjı"])}</td>
+            <td>${num(cData["Cari Oran"])}</td><td>${num(cData["Asit Test Oranı"])}</td>
+            <td>${num(cData["Borç/Öz Kaynak"])}</td><td>${num(cData["Nakit Döngüsü"])} Gün</td>
+            <td>${num(cData["Stok Devir Hızı"])}</td><td>${num(cData["Stok Süresi"])} Gün</td>
+            <td>${num(cData["Alacak Devir Hızı"])}</td><td>${num(cData["Alacak Süresi"])} Gün</td>
+            <td>${num(cData["Borç Devir Hızı"])}</td><td>${num(cData["Borç Süresi"])} Gün</td>
+            <td class="${cls(cData["ROIC"])}">${pct(cData["ROIC"])}</td>
+            <td class="${cls(cData["ROA"])}">${pct(cData["ROA"])}</td>
+            <td class="${cls(cData["ROE"])}">${pct(cData["ROE"])}</td>
+          `;
+          row.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (window.finOpenDetail) window.finOpenDetail(lazyTicker);
+          });
+      }
       row.style.display = "";
       const parentId = row.getAttribute("data-parent");
       if(parentId){
@@ -548,6 +583,59 @@ window.secToggleRow = function(id) {
         });
     } else {
         caret.parentElement.parentElement.classList.add("sec-expanded");
-        rows.forEach(row => row.style.display = "table-row");
+        rows.forEach(row => {
+            // Lazy level-3: data-lazy olan TR'leri ilk expand'da doldur
+            const lazyTicker = row.getAttribute("data-lazy");
+            if (lazyTicker) {
+                row.removeAttribute("data-lazy");
+                const cData = secMap[lazyTicker] || {};
+                const cInfo = (window.__secCompMap && window.__secCompMap[lazyTicker]) || {};
+                const logoHtml = cInfo.logourl ? `<img src="${cInfo.logourl}" class="sec-comp-logo">` : '';
+
+                const num = (v) => (v === null || v === undefined) ? `<span class="muted">-</span>` : Number(v).toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+                const pct = (v) => (v === null || v === undefined) ? `<span class="muted">-</span>` : (Number(v) * 100).toFixed(1) + "%";
+                const cls = (v) => (v > 0 ? "pos" : (v < 0 ? "neg" : ""));
+                const money = (v) => (v === null || v === undefined) ? `<span class="muted">-</span>` : finFormatMoneyCompact(v, { decimals: 1 });
+
+                row.style.cursor = "pointer";
+                row.innerHTML = `
+                  <td>
+                    <div class="sec-cell-inner">
+                      ${logoHtml}
+                      <span>${lazyTicker}</span>
+                      <span class="muted" style="margin-left:6px; font-size:10px;">${cInfo.name || ''}</span>
+                      <span class="sec-row-actions">
+                        <span class="fp-menu-btn" title="İşlemler"
+                              onclick="event.stopPropagation(); fpOpenRowMenu('${lazyTicker}', event);">
+                          <i class="fa-solid fa-ellipsis"></i>
+                        </span>
+                      </span>
+                    </div>
+                  </td>
+                  <td data-label="Piyasa Değeri">${money(cData["Piyasa Değeri"])}</td>
+                  <td data-label="Firma Değeri">${money(cData["Firma Değeri"])}</td>
+                  <td class="${cls(cData["Brüt Kar Marjı"])}">${pct(cData["Brüt Kar Marjı"])}</td>
+                  <td class="${cls(cData["Faaliyet Kâr Marjı"])}">${pct(cData["Faaliyet Kâr Marjı"])}</td>
+                  <td>${num(cData["Cari Oran"])}</td>
+                  <td>${num(cData["Asit Test Oranı"])}</td>
+                  <td>${num(cData["Borç/Öz Kaynak"])}</td>
+                  <td>${num(cData["Nakit Döngüsü"])} Gün</td>
+                  <td>${num(cData["Stok Devir Hızı"])}</td>
+                  <td>${num(cData["Stok Süresi"])} Gün</td>
+                  <td>${num(cData["Alacak Devir Hızı"])}</td>
+                  <td>${num(cData["Alacak Süresi"])} Gün</td>
+                  <td>${num(cData["Borç Devir Hızı"])}</td>
+                  <td>${num(cData["Borç Süresi"])} Gün</td>
+                  <td class="${cls(cData["ROIC"])}">${pct(cData["ROIC"])}</td>
+                  <td class="${cls(cData["ROA"])}">${pct(cData["ROA"])}</td>
+                  <td class="${cls(cData["ROE"])}">${pct(cData["ROE"])}</td>
+                `;
+                row.addEventListener("click", (e) => {
+                  e.stopPropagation();
+                  if (window.finOpenDetail) window.finOpenDetail(lazyTicker);
+                });
+            }
+            row.style.display = "table-row";
+        });
     }
 };
