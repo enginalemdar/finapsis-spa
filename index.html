@@ -32,38 +32,18 @@
     <button class="tab-btn" onclick="switchTab('news')">Haberler</button>
   </nav>
 
-  <div class="sub-tabs-container">
-      </div>
+  <div class="sub-tabs-container"></div>
 
-  <div id="view-screener" class="view-section active">
-      </div>
-
-  <div id="view-companies" class="view-section">
-      </div>
-
-  <div id="view-sectors" class="view-section">
-      </div>
-
-  <div id="view-diagrams" class="view-section">
-      </div>
-
-  <div id="view-compare" class="view-section">
-      </div>
-
-  <div id="view-portfolio" class="view-section">
-      </div>
-
-  <div id="view-detail" class="view-section">
-      </div>
-
-  <div id="view-indicators" class="view-section">
-      </div>
-
-  <div id="view-calendar-list" class="view-section">
-      </div>
-
-  <div id="view-news" class="view-section">
-      </div>
+  <div id="view-screener" class="view-section active"></div>
+  <div id="view-companies" class="view-section"></div>
+  <div id="view-sectors" class="view-section"></div>
+  <div id="view-diagrams" class="view-section"></div>
+  <div id="view-compare" class="view-section"></div>
+  <div id="view-portfolio" class="view-section"></div>
+  <div id="view-detail" class="view-section"></div>
+  <div id="view-indicators" class="view-section"></div>
+  <div id="view-calendar-list" class="view-section"></div>
+  <div id="view-news" class="view-section"></div>
 
   <div id="fpRowMenuOverlay" onclick="fpCloseRowMenu()">
     <div id="fpRowMenu" onclick="event.stopPropagation()">
@@ -86,16 +66,73 @@
     </div>
   </div>
 
-  <script src="js/global.js"></script>
-  <script src="js/screener.js"></script>
-  <script src="js/companies.js"></script>
-  <script src="js/sectors.js"></script>
-  <script src="js/diagrams.js"></script>
-  <script src="js/compare.js"></script>
-  <script src="js/portfolio.js"></script>
-  <script src="js/detail.js"></script>
-  <script src="js/calendar.js"></script>
-  <script src="js/news.js"></script>
+  <script>
+    async function loadViews() {
+      const views = [
+        { id: 'view-screener', file: 'views/screener.html' },
+        { id: 'view-companies', file: 'views/companies.html' },
+        { id: 'view-sectors', file: 'views/sectors.html' },
+        { id: 'view-diagrams', file: 'views/diagrams.html' },
+        { id: 'view-compare', file: 'views/compare.html' },
+        { id: 'view-portfolio', file: 'views/portfolio.html' },
+        { id: 'view-detail', file: 'views/detail.html' },
+        { id: 'view-indicators', file: 'views/indicators.html' },
+        { id: 'view-calendar-list', file: 'views/calendar.html' },
+        { id: 'view-news', file: 'views/news.html' }
+      ];
+
+      // Tüm HTML dosyalarını paralel olarak çek
+      const promises = views.map(async (v) => {
+        try {
+          const resp = await fetch(v.file);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const html = await resp.text();
+          const el = document.getElementById(v.id);
+          if (el) el.innerHTML = html;
+        } catch (e) {
+          console.error(`Görünüm yüklenemedi: ${v.file}`, e);
+          const el = document.getElementById(v.id);
+          if(el) el.innerHTML = `<div style="color:red; padding:20px;">Hata: ${v.file} yüklenemedi.</div>`;
+        }
+      });
+
+      await Promise.all(promises);
+      console.log("✅ Tüm HTML görünümleri yüklendi.");
+    }
+
+    // 2. ADIM: Önce HTML'leri yükle, sonra Scriptleri başlat
+    window.addEventListener('DOMContentLoaded', async () => {
+        // Güvenlik: 5 saniye sonra preloader hala varsa zorla kapat (Hata durumunda siyah ekran kalmasın)
+        setTimeout(() => {
+            const pl = document.getElementById("preloader");
+            if(pl) pl.style.display = 'none';
+        }, 5000);
+
+        await loadViews();
+
+        // HTML yüklendikten sonra JS dosyalarını dinamik olarak yükle
+        // Sıralama önemlidir: Global önce, diğerleri sonra
+        const scripts = [
+            'js/global.js',
+            'js/screener.js',
+            'js/companies.js',
+            'js/sectors.js',
+            'js/diagrams.js',
+            'js/compare.js',
+            'js/portfolio.js',
+            'js/detail.js',
+            'js/calendar.js',
+            'js/news.js'
+        ];
+
+        for (const src of scripts) {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = false; // Sırayla yüklenmelerini sağlar
+            document.body.appendChild(script);
+        }
+    });
+  </script>
 
 </body>
 </html>
