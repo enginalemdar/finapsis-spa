@@ -2052,7 +2052,6 @@ tr.sec-row-level-3:hover td {
   --text-muted: rgba(255, 255, 255, 0.5);
   height: 100%;
   width: 100%;
-  overflow: hidden;
   background: #000;
   padding: 0;
   box-sizing: border-box;
@@ -2068,7 +2067,6 @@ tr.sec-row-level-3:hover td {
   width: 100%;
   background: #000;
   padding: 10px 20px 20px 20px;
-  overflow: hidden;
 }
 
 /* Yıldız sadece box-sizing yapsın, fontu ellemesin */
@@ -2083,7 +2081,6 @@ tr.sec-row-level-3:hover td {
   position: relative;
   background: var(--bg);
   height: 100%;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
