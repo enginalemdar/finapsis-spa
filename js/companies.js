@@ -241,7 +241,7 @@ function renderCompanyList() {
             <img src="${c.logourl}" loading="lazy" style="width:32px; height:32px; object-fit:contain; background:#111; border-radius:6px; flex-shrink: 0;" onerror="this.style.display='none'">
             <div style="display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden;">
               <a href="#" onclick="event.preventDefault(); if(window.finOpenDetail) window.finOpenDetail('${c.ticker}'); else { localStorage.setItem('finapsis_detail_ticker','${c.ticker}'); switchTab('detail'); }" style="font-weight:600; font-size:14px; color:#fff; text-decoration:none; cursor:pointer;">${c.name}</a>
-              <div style="font-size:11px; color:#666;">${c.ticker} • ${c.sector}</div>
+              <div style="font-size:11px; color:#666;">${c.ticker} • ${c.sector === '#N/A' ? '-' : c.sector}</div>
             </div>
             <button class="fp-menu-btn" title="İşlemler" onclick="event.stopPropagation(); fpOpenRowMenu('${c.ticker}', event)">
               <i class="fa-solid fa-ellipsis-vertical"></i>
@@ -351,7 +351,7 @@ function updateCompanyListSectorDropdown() {
     const sectors = [...new Set(window.companies
         .filter(c => c.group === window.activeGroup)
         .map(c => c.sector))]
-        .filter(Boolean)
+        .filter(s => s && s !== '#N/A')
         .sort();
 
     sectors.forEach(sec => {
@@ -539,13 +539,13 @@ window.clTogglePopup = function(type, e) {
         if (type === 'sector') {
             items = [...new Set(window.companies
                 .filter(c => c.group === window.activeGroup)
-                .map(c => c.sector))].filter(Boolean).sort((a,b) => a.localeCompare(b,'tr'));
+                .map(c => c.sector))].filter(s => s && s !== '#N/A').sort((a,b) => a.localeCompare(b,'tr'));
         } 
         else if (type === 'industry') {
             if(!window.clFilters.sector) return; 
             items = [...new Set(window.companies
                 .filter(c => c.group === window.activeGroup && c.sector === window.clFilters.sector)
-                .map(c => c.industry))].filter(Boolean).sort((a,b) => a.localeCompare(b,'tr'));
+                .map(c => c.industry))].filter(i => i && i !== '#N/A').sort((a,b) => a.localeCompare(b,'tr'));
         }
 
         let listHtml = `<div class="cl-popup-item" onclick="clSelectFilter('${type}', '')">TÜMÜ</div>`;
