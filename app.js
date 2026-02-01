@@ -1,3 +1,8 @@
+(function () {
+  const s = window.__SESSION__ || null;
+  console.log("[SESSION]", s);
+})();
+
 // --- ORTAK GLOBAL VERİLER & SABİTLER ---
     // Şirket veri yapısı örn: { ticker, name, group: "bist"|"sp"|"doviz"|"emtia"|"kripto", logourl, slug, unit }
 // --- CLOUDFLARE DATA URL ---
