@@ -2699,3 +2699,25 @@ tr.sec-row-level-3:hover td { background: #252525 !important; }
   #finapsis-news-widget .search-container { flex: 1; width: auto; min-width: 0; order: 1; }
   #finapsis-news-widget .mobile-filter-trigger { position: static; order: 2; }
 }
+/* --- Pro kilidi: üst tab butonları --- */
+nav.app-tabs .tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+nav.app-tabs .tab-btn .tab-lock {
+  display: none;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+nav.app-tabs .tab-btn.locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+nav.app-tabs .tab-btn.locked .tab-lock {
+  display: inline-block;
+}
