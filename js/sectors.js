@@ -126,6 +126,9 @@ window.secRenderTable = function(){
     if (!tbody) return;
     tbody.innerHTML = "";
 
+    // Her render'da map'ı taze al — grup değişince stale kalmasın
+    secMap = window.__FIN_MAP || {};
+
     if(window.secUpdateBadges) window.secUpdateBadges();
     updateSecSortHeaderUI();
 
@@ -133,10 +136,8 @@ window.secRenderTable = function(){
     const tree = {};
 
     companies.forEach(c => {
-        const rawSec = (c.sector && String(c.sector).trim());
-        const secName = (!rawSec || rawSec === '#N/A') ? "Diğer" : rawSec;
-        const rawInd = (c.industry && String(c.industry).trim());
-        const indName = (!rawInd || rawInd === '#N/A') ? "Diğer" : rawInd;
+        const secName = (c.sector && String(c.sector).trim()) ? c.sector : "Diğer";
+        const indName = (c.industry && String(c.industry).trim()) ? c.industry : "Diğer";
         const t = String(c.ticker).toUpperCase();
 
         if (!tree[secName]) tree[secName] = { name: secName, companies: [], industries: {} };
@@ -210,6 +211,8 @@ window.secRenderTable = function(){
         <td class="${cls(st["ROE"])}">${pct(st["ROE"])}</td>
     `;
 
+    const frag = document.createDocumentFragment();
+
     sectorList.forEach((secNode, secIdx) => {
         const secId = `sec_${secIdx}`;
         const totalComps = secNode.industries.reduce((acc, curr) => acc + curr.tickers.length, 0);
@@ -228,7 +231,7 @@ window.secRenderTable = function(){
             </td>
             ${renderRowCells(secNode.stats)}
         `;
-        tbody.appendChild(secTr);
+        frag.appendChild(secTr);
 
         secNode.industries.sort(sortFn);
 
@@ -250,7 +253,7 @@ window.secRenderTable = function(){
                 </td>
                 ${renderRowCells(indNode.stats)}
             `;
-            tbody.appendChild(indTr);
+            frag.appendChild(indTr);
 
             indNode.tickers.sort((tA, tB) => {
                 if(secSort.key === 'name') return secSort.asc ? tA.localeCompare(tB) : tB.localeCompare(tA);
@@ -292,10 +295,13 @@ window.secRenderTable = function(){
                   ${renderRowCells(cData)}
                 `;
 
-                tbody.appendChild(compTr);
+                frag.appendChild(compTr);
             });
         });
     });
+
+    // Tüm satırları tek seferinde DOM'a yaz — reflow sayısını minimuma indir
+    tbody.appendChild(frag);
 };
 
 window.secUpdateBadges = function() {
