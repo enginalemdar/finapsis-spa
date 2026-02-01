@@ -95,7 +95,13 @@ function finEnsureCompanies() {
 function finEnsureIndicators() {
   if (Array.isArray(window.indicators) && window.indicators.length) return;
   try {
-    window.indicators = JSON.parse(finGetRawJson(window.__INDICATORS_RAW, "[]"));
+    const raw = finGetRawJson(window.__INDICATORS_RAW, "[]");
+    // Boş string kontrolü
+    if (!raw || raw.trim() === "") {
+      window.indicators = [];
+      return;
+    }
+    window.indicators = JSON.parse(raw);
   } catch (e) {
     console.error("indicators JSON.parse failed", e);
     window.indicators = [];
@@ -282,8 +288,42 @@ async function loadFinapsisData() {
 
           // Map'e de yazalım ki metrik işlemede kullanılsın
           if (!window.__FIN_MAP[t]) window.__FIN_MAP[t] = {};
-          window.__FIN_MAP[t]["price"] = p;
-          window.__FIN_MAP[t]["prev"] = prev;
+          const target = window.__FIN_MAP[t];
+          
+          target["price"] = p;
+          target["prev"] = prev;
+
+          // 🔥 KRİTİK: PİYASA DEĞERİ HESAPLAMA (Fiyat geldiğinde hemen hesapla)
+          // Eğer metrik verileri (Hisse Adedi) fiyattan önce indiyse, fiyat gelince MC'yi hemen hesapla.
+          const shares = target["Hisse Adedi"] || target["sh"] || target["Total Common Shares Outstanding"];
+          
+          if (p > 0 && shares > 0) {
+            let finalShares = shares;
+            // ADR kontrolü (varsa)
+            if (window.__ADR_CACHE && window.__ADR_CACHE[t]) {
+              finalShares = shares / window.__ADR_CACHE[t];
+            }
+            target["Piyasa Değeri"] = p * finalShares;
+            target["Market Cap"] = p * finalShares;
+            
+            // F/K hesapla (eğer ni varsa)
+            const ni = target["Dönem Karı (Zararı)"] || target["ni"];
+            if (ni) {
+              target["F/K"] = (p * finalShares) / ni;
+            }
+            
+            // PD/DD hesapla (eğer eq varsa)
+            const equity = target["Ana Ortaklığa Ait Özkaynaklar"] || target["eq"];
+            if (equity > 0) {
+              target["PD/DD"] = (p * finalShares) / equity;
+            }
+            
+            // Fiyat/Satışlar hesapla (eğer rev varsa)
+            const rev = target["Satış Gelirleri"] || target["rev"];
+            if (rev) {
+              target["Fiyat/Satışlar"] = (p * finalShares) / rev;
+            }
+          }
         }
       });
 
@@ -304,8 +344,13 @@ async function loadFinapsisData() {
 
 // B. Metrik Verilerini Yükle ve Hesapla (Asıl İşlem Burası)
 async function finBuildMapForActiveGroup(done) {
+    console.log("🔄 [METRICS] finBuildMapForActiveGroup çağrıldı");
+    
     if (typeof done === "function") window.__FIN_METRICS_WAITERS.push(done);
-    if (__loadingMetrics) return;
+    if (__loadingMetrics) {
+        console.log("⏳ [METRICS] Zaten yükleniyor, beklemeye alındı");
+        return;
+    }
     
     __loadingMetrics = true;
     window.isFinDataReady = false; 
@@ -314,6 +359,8 @@ async function finBuildMapForActiveGroup(done) {
     updateScreenerLoadingState(true);
 
     const g = String(window.activeGroup || "bist");
+    console.log(`📦 [METRICS] Aktif grup: ${g}`);
+    
     window.__FIN_MAP = window.__FIN_MAP || {};
 
     // Sadece aktif gruptaki hisseleri filtrele (Performans)
@@ -326,6 +373,8 @@ async function finBuildMapForActiveGroup(done) {
         })
         .map(c => String(c.ticker).trim().toUpperCase())
     );
+    
+    console.log(`📊 [METRICS] ${activeTickers.size} ticker için veri indirilecek`);
 
     try {
         console.time("VeriIndirme");
@@ -359,7 +408,10 @@ async function finBuildMapForActiveGroup(done) {
         for (let i = 0; i < totalPages; i++) pageIds.push(String(i).padStart(3, '0'));
 
         // 3. Veriyi İşleme Fonksiyonu (Piyasa Değeri Burada Hesaplanır)
+        let processedCount = 0;
         const processItem = (item) => {
+             processedCount++;
+             
              if (!item || !item.t) return;
              const ticker = String(item.t).trim().toUpperCase();
              
@@ -399,6 +451,13 @@ async function finBuildMapForActiveGroup(done) {
                  target["Piyasa Değeri"] = mc;
                  target["Market Cap"] = mc;
 
+                 // 🔍 DEBUG: İlk 10 ticker için MUTLAKA log bas
+                 const debugCount = window.__MC_DEBUG_COUNT || 0;
+                 if (debugCount < 10) {
+                     console.log(`[MC DEBUG ${debugCount+1}] ${ticker}: price=${price}, shares=${shares}, MC=${mc.toLocaleString()}`);
+                     window.__MC_DEBUG_COUNT = debugCount + 1;
+                 }
+
                  // F/K (P/E)
                  if (vals.ni) {
                      target["F/K"] = mc / vals.ni;
@@ -422,8 +481,17 @@ async function finBuildMapForActiveGroup(done) {
                  // FD/SATIŞ (EV/Sales) - Eğer EV yoksa hesapla
                  // EV = Market Cap + Net Debt (Basitleştirilmiş)
                  // Veya direkt EV varsa onu kullanırız. 
+             } else {
+                 // 🔍 DEBUG: Neden hesaplanamadı?
+                 const warnCount = window.__MC_WARN_COUNT || 0;
+                 if (warnCount < 5) {
+                     console.warn(`[MC WARN ${warnCount+1}] ${ticker}: price=${price}, shares=${shares} - MC hesaplanamadı`);
+                     window.__MC_WARN_COUNT = warnCount + 1;
+                 }
              }
         };
+        
+        console.log("🔄 [METRICS] processItem fonksiyonu tanımlandı, indirme başlıyor...");
 
         // 4. Parçalı (Chunked) İndirme ve İşleme
         const BATCH_SIZE = 4; // Aynı anda 4 dosya indir
@@ -435,6 +503,8 @@ async function finBuildMapForActiveGroup(done) {
             for (const data of results) {
                 if (!Array.isArray(data)) continue;
                 
+                const beforeCount = processedCount;
+                
                 // Donmayı önlemek için 500'erli paketle
                 const CHUNK_SIZE = 500;
                 for (let j = 0; j < data.length; j += CHUNK_SIZE) {
@@ -443,12 +513,34 @@ async function finBuildMapForActiveGroup(done) {
                     // UI'a nefes aldır
                     await new Promise(r => setTimeout(r, 0)); 
                 }
+                
+                const processedInThisBatch = processedCount - beforeCount;
+                if (processedInThisBatch > 0) {
+                    console.log(`✅ [METRICS] Batch işlendi: ${processedInThisBatch} item`);
+                }
             }
         }
         console.timeEnd("VeriIndirme");
 
+        // 🔍 ÖZET İSTATİSTİK
+        console.log(`📦 [METRICS] Toplam ${processedCount} item işlendi`);
+        
+        let mcCount = 0, fkCount = 0, pbCount = 0;
+        for (const ticker of activeTickers) {
+            const d = window.__FIN_MAP[ticker];
+            if (d?.["Piyasa Değeri"] > 0) mcCount++;
+            if (d?.["F/K"]) fkCount++;
+            if (d?.["PD/DD"]) pbCount++;
+        }
+        console.log(`📊 [METRICS] Aktif Grup (${g}): ${activeTickers.size} ticker`);
+        console.log(`   ✅ Piyasa Değeri: ${mcCount} (${(mcCount/activeTickers.size*100).toFixed(1)}%)`);
+        console.log(`   ✅ F/K: ${fkCount} (${(fkCount/activeTickers.size*100).toFixed(1)}%)`);
+        console.log(`   ✅ PD/DD: ${pbCount} (${(pbCount/activeTickers.size*100).toFixed(1)}%)`);
+
     } catch (e) {
-        console.error("[METRICS] Hata:", e);
+        console.error("[METRICS] HATA OLUŞTU:", e);
+        console.error("[METRICS] Hata detayı:", e.message);
+        console.error("[METRICS] Stack:", e.stack);
     } finally {
         __loadingMetrics = false;
         window.isFinDataReady = true; 
@@ -769,10 +861,29 @@ async function bootFinapsis() {
     console.log("🚀 [System] Veri motoru başlatılıyor...");
     finBuildMapForActiveGroup(() => {
       console.log("✅ [System] Tüm veriler hazır.");
-      const activeTab = localStorage.getItem('finapsis_active_main_tab');
-      if (activeTab === 'karsilastirma.html' && window.cmpRender) window.cmpRender();
-      if (activeTab === 'screener.html' && typeof renderScreenerResults === "function") renderScreenerResults();
-      if (activeTab === 'companieslist.html' && typeof renderCompanyList === "function") renderCompanyList();
+      
+      // Render fonksiyonlarını hemen çağırmak yerine biraz bekle (scriptler yüklensin)
+      setTimeout(() => {
+        const activeTab = localStorage.getItem('finapsis_active_main_tab');
+        console.log("📍 [Boot] Aktif tab:", activeTab);
+        
+        if (activeTab === 'karsilastirma.html' && window.cmpRender) {
+          console.log("🎯 [Boot] Compare render ediliyor...");
+          window.cmpRender();
+        }
+        if (activeTab === 'screener.html' || !activeTab) {
+          if (typeof renderScreenerResults === "function") {
+            console.log("🎯 [Boot] Screener render ediliyor...");
+            renderScreenerResults();
+          } else {
+            console.warn("⚠️ [Boot] renderScreenerResults henüz tanımlı değil");
+          }
+        }
+        if (activeTab === 'companieslist.html' && typeof renderCompanyList === "function") {
+          console.log("🎯 [Boot] Companies render ediliyor...");
+          renderCompanyList();
+        }
+      }, 200);
     });
   }
 
