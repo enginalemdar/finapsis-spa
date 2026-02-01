@@ -1,4 +1,4 @@
-// js/screener.js
+// js/screener.js (ULTRA FAST - NO CALCULATION)
 
 const METRIC_DEFINITIONS = [
     { id: 'fk', label: 'DÜŞÜK F/K', dataKey: 'F/K', direction: 'low', icon: 'fa-tag' },
@@ -29,9 +29,7 @@ const METRIC_DEFINITIONS = [
     { id: 'equity', label: 'YÜKSEK ÖZ KAYNAK', dataKey: 'Ana Ortaklığa Ait Özkaynaklar', direction: 'high', icon: 'fa-landmark' }
 ];
 
-let processedData = [];
-let sectorStats = {};
-let globalStats = {};
+let processedData = []; 
 let activeMetrics = [];
 let comparisonMode = 'sector';
 let calculationMethod = 'median';
@@ -45,155 +43,85 @@ function initScreener() {
     const isMapLoaded = window.__FIN_MAP && Object.keys(window.__FIN_MAP).length > 0;
 
     if (isMapLoaded) {
-        console.log("[Screener] Veri hazır, işleniyor...");
-        // Ağır işlemleri zamana yayarak başlat
-        setTimeout(() => {
-            try { 
-                processScreenerData(); 
-                renderMetricsPool(); 
-                renderScreenerResults(); // Artık async çalışır
-                setupDragAndDrop(); 
-            } catch(e) { console.error(e); }
-        }, 50);
+        processScreenerData(); 
+        renderMetricsPool(); 
+        renderScreenerResults();
+        setupDragAndDrop(); 
     } else {
-        console.log("[Screener] Metrics indiriliyor...");
         const tbody = document.getElementById('screener-results-body');
         if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:#666;"><div class="spinner" style="margin:0 auto 10px auto;"></div>Veriler Yükleniyor...</td></tr>';
 
-        finBuildMapForActiveGroup(() => {
-            _renderScreenerUI(); 
-        });
+        // Veri indirmeyi tetikle
+        if(typeof finBuildMapForActiveGroup === 'function') {
+            finBuildMapForActiveGroup(() => {
+                _renderScreenerUI(); 
+            });
+        }
     }
 }
 
 function _renderScreenerUI() {
-    // İşlemleri parçala ki UI donmasın
-    setTimeout(() => {
-        try { processScreenerData(); } catch(e) { console.error(e); }
-    }, 10);
-    
-    setTimeout(() => {
-        try { renderMetricsPool(); } catch(e) {}
-        try { renderScreenerResults(); } catch(e) {}
-        try { setupDragAndDrop(); } catch(e) {}
-        try { scUpdateFilterBadges(); } catch(e) {}
-    }, 50);
+    processScreenerData();
+    renderMetricsPool();
+    renderScreenerResults();
+    setupDragAndDrop();
+    scUpdateFilterBadges();
 }
 
 // ------------------------------------------------
-// PERFORMANS OPTİMİZASYONU: Veri İşleme
+// PERFORMANS OPTİMİZASYONU: Veri Hazırlığı
 // ------------------------------------------------
 function processScreenerData() {
-    const map = window.__FIN_MAP || {};
-    // DefMap'i döngü dışında bir kez oluştur
-    const defMap = {};
-    METRIC_DEFINITIONS.forEach(m => defMap[m.dataKey] = m);
-
     // Sadece aktif grubu filtrele
-    // map() içinde her seferinde object create etmek yerine,
-    // sadece gerekli verileri alıp hızlıca işleyelim.
+    // Map'ten verileri KOPYALAMAK yok. Sadece pointer tutacağız.
     processedData = (window.companies || []).filter(c => c.group === window.activeGroup);
-    
-    // NOT: Burada tüm metrikleri önceden hesaplamak (pre-calc) yerine,
-    // renderScreenerResults içinde, sadece SEÇİLİ metrikler için lookup yapacağız.
-    // Bu, binlerce şirket x 30 metrik döngüsünü engeller.
-    // processedData artık sadece ham şirket listesidir.
-}
-
-let __screenerStatsKey = "";
-
-function ensureScreenerStats(){
-  // Eğer metrik seçili değilse hesaplama
-  if (!activeMetrics || activeMetrics.length === 0) return;
-
-  const keys = activeMetrics.map(m => m.dataKey).filter(Boolean);
-  keys.sort();
-
-  const keyStr = `${window.activeGroup}|${keys.join(",")}`;
-  if (__screenerStatsKey === keyStr) return;   
-  __screenerStatsKey = keyStr;
-
-  sectorStats = {};
-  globalStats = {};
-
-  const map = window.__FIN_MAP || {};
-  const secValues = {};
-  const globValues = {};
-
-  // Döngü optimizasyonu
-  for (let i = 0; i < processedData.length; i++) {
-      const comp = processedData[i];
-      const d = map[comp.ticker];
-      if (!d) continue;
-
-      const sec = comp.sector || "Diğer";
-      if (!secValues[sec]) secValues[sec] = {};
-      const secObj = secValues[sec];
-
-      for (let j = 0; j < keys.length; j++){
-          const k = keys[j];
-          const v = d[k]; // Direkt map'ten oku
-          
-          if (v !== undefined && v !== null) {
-              // Yüzde düzeltmesi (Performans için burada basit kontrol)
-              let finalVal = v;
-              // NOT: Ham veride yüzde 0.15 geliyorsa ve biz 15 istiyorsak:
-              // Burada global bir kural uygulayabiliriz ama şimdilik ham veri alalım.
-              // (Screener mantığında küçükse çarpma işini render'da yaparız)
-              
-              (secObj[k] ||= []).push(finalVal);
-              (globValues[k] ||= []).push(finalVal);
-          }
-      }
-  }
-
-  const getStats = (arr) => {
-    if (!arr || arr.length === 0) return { mean: null, median: null };
-    // Numeric sort (hızlı)
-    arr.sort((a,b) => a-b);
-    let sum = 0;
-    const len = arr.length;
-    for (let i=0; i<len; i++) sum += arr[i];
-    const mid = Math.floor(len/2);
-    const median = (len % 2) ? arr[mid] : (arr[mid-1] + arr[mid]) / 2;
-    return { mean: sum / len, median };
-  };
-
-  // İstatistikleri hesapla
-  for (const sec in secValues){
-    sectorStats[sec] = {};
-    for (let i=0;i<keys.length;i++){
-      const k = keys[i];
-      if (secValues[sec][k]) sectorStats[sec][k] = getStats(secValues[sec][k]);
-    }
-  }
-
-  for (let i=0;i<keys.length;i++){
-    const k = keys[i];
-    if (globValues[k]) globalStats[k] = getStats(globValues[k]);
-  }
 }
 
 // ------------------------------------------------
-// PERFORMANS OPTİMİZASYONU: ASYNC RENDER
+// ASIL OPTİMİZASYON: Lookup from JSON
+// ------------------------------------------------
+function getStatValue(sector, metricKey, method) {
+    // 🚀 GLOBAL JSON'DAN OKU (HESAPLAMA YOK!)
+    const stats = window.__SCREENER_STATS_CACHE || {};
+    const groupData = stats[window.activeGroup] || {}; // "bist", "nyse" vb.
+
+    let statObj = null;
+
+    if (comparisonMode === 'global') {
+        // Genel istatistik
+        statObj = groupData.global ? groupData.global[metricKey] : null;
+    } else {
+        // Sektör bazlı istatistik
+        const sec = sector || "Diğer";
+        if (groupData.sectors && groupData.sectors[sec]) {
+            statObj = groupData.sectors[sec][metricKey];
+        }
+    }
+
+    if (!statObj) return null;
+    
+    // Method: 'median' veya 'mean'
+    return statObj[method];
+}
+
+// ------------------------------------------------
+// ASYNC RENDER & CHUNKING
 // ------------------------------------------------
 let __renderTimeout;
 
 function renderScreenerResults() {
-    // Debounce: Hızlı arka arkaya çağrılırsa (filtre yazarken), eskisini iptal et
+    // Debounce
     if (__renderTimeout) clearTimeout(__renderTimeout);
 
     const tbody = document.getElementById('screener-results-body');
     if (!tbody) return;
 
-    // Hemen "Hesaplanıyor" göster
-    if (!isScreenerComputing) {
-        tbody.style.opacity = "0.5";
-    }
+    if (!isScreenerComputing) tbody.style.opacity = "0.5";
 
+    // 100ms gecikme ile UI bloklanmasını önle
     __renderTimeout = setTimeout(() => {
         _renderScreenerResultsAsync(tbody);
-    }, 50); // 50ms gecikme ile UI'ın nefes almasını sağla
+    }, 100); 
 }
 
 async function _renderScreenerResultsAsync(tbody) {
@@ -212,49 +140,43 @@ async function _renderScreenerResultsAsync(tbody) {
         return;
     }
 
-    // İstatistikleri güncelle (Gerekirse)
-    ensureScreenerStats();
-
     const map = window.__FIN_MAP || {};
     const sectorFilter = window.scSectorSelection;
     const industryFilter = window.scIndustrySelection;
     
     // Chunking: Hesaplamayı parçalara böl
-    const chunkSize = 500; // Her seferinde 500 şirket işle
+    const chunkSize = 200; 
     let rankedData = [];
     
     // 1. ADIM: HESAPLAMA (Chunked Loop)
     for (let i = 0; i < processedData.length; i += chunkSize) {
         const chunk = processedData.slice(i, i + chunkSize);
         
-        // Bu chunk'ı işle
         const chunkResults = chunk.map(comp => {
-            // -- FİLTRELEME (EN BAŞTA YAP - HIZ KAZANCI) --
+            // FİLTRELEME
             if (sectorFilter && comp.sector !== sectorFilter) return null;
             if (industryFilter && comp.industry !== industryFilter) return null;
 
             let score = 0;
             let matchDetails = [];
-            const d = map[comp.ticker] || {}; // Veriyi lookup yap
+            const d = map[comp.ticker] || {}; 
 
             for (const metric of activeMetrics) {
                 let val = d[metric.dataKey];
                 
-                // Yüzde düzeltmesi (render anında)
+                // Yüzde düzeltmesi
                 if (metric.isPercent && val !== undefined && val !== null && Math.abs(val) < 5) {
                     val = val * 100;
                 }
 
-                const statObj = comparisonMode === 'sector' 
-                    ? (sectorStats[comp.sector] ? sectorStats[comp.sector][metric.dataKey] : null) 
-                    : globalStats[metric.dataKey];
-                
-                const avg = statObj ? statObj[calculationMethod] : null;
+                // 🚀 BROWSERDA HESAP YOK, JSON'DAN OKU
+                const avg = getStatValue(comp.sector, metric.dataKey, calculationMethod);
 
                 if (val !== undefined && val !== null && avg !== undefined && avg !== null) {
                     let isGood = false;
                     
                     if (metric.direction === 'low') {
+                        // Düşük iyiyse (F/K): Pozitif olmalı ve ortalamadan küçük olmalı
                         if (val > 0 && val < avg) isGood = true; 
                     } 
                     else if (metric.direction === 'high') {
@@ -272,7 +194,7 @@ async function _renderScreenerResultsAsync(tbody) {
                     });
                 }
             }
-            // Spread yerine manuel atama (daha hızlı)
+            
             return { 
                 ticker: comp.ticker, 
                 name: comp.name, 
@@ -285,7 +207,7 @@ async function _renderScreenerResultsAsync(tbody) {
 
         rankedData = rankedData.concat(chunkResults);
 
-        // UI'a nefes aldır (Yield to Main Thread)
+        // UI'a nefes aldır (her chunk sonrası)
         await new Promise(resolve => setTimeout(resolve, 0));
     }
 
@@ -295,7 +217,6 @@ async function _renderScreenerResultsAsync(tbody) {
 
         // Eşitlik durumunda ilk metriğe göre sırala
         for (const metric of activeMetrics) {
-            // matchDetails içinde bul (array find biraz yavaştır ama sadece eşit skorlarda çalışır)
             const detA = a.matchDetails.find(x => x.id === metric.id);
             const detB = b.matchDetails.find(x => x.id === metric.id);
 
@@ -328,9 +249,7 @@ async function _renderScreenerResultsAsync(tbody) {
     const dataToRender = rankedData.slice(0, displayLimit);
 
     const htmlRows = dataToRender.map((comp, index) => {
-        // matchDetails zaten var, sadece activeMetrics sırasına göre diz
         const sortedDetails = [];
-        // Performans için loop
         for(const m of activeMetrics) {
             const d = comp.matchDetails.find(x => x.id === m.id);
             if(d) sortedDetails.push(d);
