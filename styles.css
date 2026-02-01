@@ -615,11 +615,11 @@ nav.app-tabs .tab-btn.active {
 }
 
 #view-companies .val-up {
-  color: #9dffb3
+  color: #00ff88
 }
 
 #view-companies .val-down {
-  color: #ff9d9d
+  color: #ff4444
 }
 
 #filterOverlay {
@@ -1876,11 +1876,11 @@ tr.sec-row-level-3:hover td {
 
 /* Renk Sınıfları */
 #view-sectors .pos {
-  color: #9dffb3;
+  color: #00ff88;
 }
 
 #view-sectors .neg {
-  color: #ff9d9d;
+  color: #ff4444;
 }
 
 #view-sectors .muted {
