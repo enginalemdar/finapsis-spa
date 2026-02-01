@@ -38,25 +38,45 @@ let calculationMethod = 'median';
 let isScreenerComputing = false;
 
 function initScreener() {
+    console.log("🎬 [Screener] initScreener çağrıldı");
+    
     try { scUpdateFilterBadges(); } catch(e){ console.error(e); }
 
     const isMapLoaded = window.__FIN_MAP && Object.keys(window.__FIN_MAP).length > 0;
+    const isDataReady = window.isFinDataReady === true;
 
-    if (isMapLoaded) {
+    console.log("📊 [Screener] Map yüklü:", isMapLoaded, "- Data hazır:", isDataReady);
+
+    if (isMapLoaded && isDataReady) {
+        console.log("✅ [Screener] Veriler hazır, render ediliyor...");
         processScreenerData(); 
         renderMetricsPool(); 
         renderScreenerResults();
         setupDragAndDrop(); 
     } else {
+        console.log("⏳ [Screener] Veriler henüz hazır değil, bekleniyor...");
         const tbody = document.getElementById('screener-results-body');
         if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:#666;"><div class="spinner" style="margin:0 auto 10px auto;"></div>Veriler Yükleniyor...</td></tr>';
 
         // Veri indirmeyi tetikle
         if(typeof finBuildMapForActiveGroup === 'function') {
             finBuildMapForActiveGroup(() => {
+                console.log("✅ [Screener] Callback geldi, render ediliyor...");
                 _renderScreenerUI(); 
             });
         }
+        
+        // YEDEK: Her 500ms kontrol et (veri gelmiş olabilir)
+        const checkInterval = setInterval(() => {
+            if (window.isFinDataReady === true && window.__FIN_MAP && Object.keys(window.__FIN_MAP).length > 0) {
+                console.log("✅ [Screener] Veriler hazır oldu (interval), render ediliyor...");
+                clearInterval(checkInterval);
+                _renderScreenerUI();
+            }
+        }, 500);
+        
+        // 10 saniye sonra timeout
+        setTimeout(() => clearInterval(checkInterval), 10000);
     }
 }
 
