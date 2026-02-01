@@ -115,10 +115,7 @@ function renderCompanyList() {
   __clAppendRequested = false;
 
   if (!append) {
-    tbody.innerHTML = `<tr><td colspan="23" style="text-align:center; padding:60px 20px; color:rgba(255,255,255,0.35);">
-      <div class="spinner" style="margin:0 auto 12px auto; width:28px; height:28px;"></div>
-      Veriler Yükleniyor...
-    </td></tr>`;
+    tbody.innerHTML = "";
     __clRenderedCount = 0;
     __clLastKey = key;
   }
@@ -193,9 +190,10 @@ function renderCompanyList() {
   function pump(){
     if (token !== window.__clRenderToken) return;
 
-    // İlk batch: loader'ı temizle
+    // İlk batch: overlay loader'ı gizle
     if (i === 0) {
-      tbody.innerHTML = "";
+      const loader = document.getElementById('cl-loader');
+      if (loader) loader.style.display = 'none';
     }
 
     const frag = document.createDocumentFragment();
