@@ -129,6 +129,11 @@
           await loadScript(src);
       }
       console.log("✅ [App] Scriptler yüklendi.");
+
+      // 3. TÜM SCRIPTLer YÜKLENDİKTEN SONRA BAŞLAT
+      if (typeof bootFinapsis === 'function') {
+          bootFinapsis();
+      }
     }
 
     // Uygulamayı Başlat
