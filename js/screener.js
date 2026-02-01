@@ -36,17 +36,25 @@ let activeMetrics = [];
 let comparisonMode = 'sector';
 let calculationMethod = 'median';
 
+// UI State
+let isScreenerComputing = false;
+
 function initScreener() {
     try { scUpdateFilterBadges(); } catch(e){ console.error(e); }
 
     const isMapLoaded = window.__FIN_MAP && Object.keys(window.__FIN_MAP).length > 0;
 
     if (isMapLoaded) {
-        console.log("[Screener] Veri hazır, tablo çiziliyor.");
-        try { processScreenerData(); } catch(e) { console.error(e); }
-        try { renderMetricsPool(); } catch(e) {}
-        try { renderScreenerResults(); } catch(e) {}
-        try { setupDragAndDrop(); } catch(e) {}
+        console.log("[Screener] Veri hazır, işleniyor...");
+        // Ağır işlemleri zamana yayarak başlat
+        setTimeout(() => {
+            try { 
+                processScreenerData(); 
+                renderMetricsPool(); 
+                renderScreenerResults(); // Artık async çalışır
+                setupDragAndDrop(); 
+            } catch(e) { console.error(e); }
+        }, 50);
     } else {
         console.log("[Screener] Metrics indiriliyor...");
         const tbody = document.getElementById('screener-results-body');
@@ -57,6 +65,340 @@ function initScreener() {
         });
     }
 }
+
+function _renderScreenerUI() {
+    // İşlemleri parçala ki UI donmasın
+    setTimeout(() => {
+        try { processScreenerData(); } catch(e) { console.error(e); }
+    }, 10);
+    
+    setTimeout(() => {
+        try { renderMetricsPool(); } catch(e) {}
+        try { renderScreenerResults(); } catch(e) {}
+        try { setupDragAndDrop(); } catch(e) {}
+        try { scUpdateFilterBadges(); } catch(e) {}
+    }, 50);
+}
+
+// ------------------------------------------------
+// PERFORMANS OPTİMİZASYONU: Veri İşleme
+// ------------------------------------------------
+function processScreenerData() {
+    const map = window.__FIN_MAP || {};
+    // DefMap'i döngü dışında bir kez oluştur
+    const defMap = {};
+    METRIC_DEFINITIONS.forEach(m => defMap[m.dataKey] = m);
+
+    // Sadece aktif grubu filtrele
+    // map() içinde her seferinde object create etmek yerine,
+    // sadece gerekli verileri alıp hızlıca işleyelim.
+    processedData = (window.companies || []).filter(c => c.group === window.activeGroup);
+    
+    // NOT: Burada tüm metrikleri önceden hesaplamak (pre-calc) yerine,
+    // renderScreenerResults içinde, sadece SEÇİLİ metrikler için lookup yapacağız.
+    // Bu, binlerce şirket x 30 metrik döngüsünü engeller.
+    // processedData artık sadece ham şirket listesidir.
+}
+
+let __screenerStatsKey = "";
+
+function ensureScreenerStats(){
+  // Eğer metrik seçili değilse hesaplama
+  if (!activeMetrics || activeMetrics.length === 0) return;
+
+  const keys = activeMetrics.map(m => m.dataKey).filter(Boolean);
+  keys.sort();
+
+  const keyStr = `${window.activeGroup}|${keys.join(",")}`;
+  if (__screenerStatsKey === keyStr) return;   
+  __screenerStatsKey = keyStr;
+
+  sectorStats = {};
+  globalStats = {};
+
+  const map = window.__FIN_MAP || {};
+  const secValues = {};
+  const globValues = {};
+
+  // Döngü optimizasyonu
+  for (let i = 0; i < processedData.length; i++) {
+      const comp = processedData[i];
+      const d = map[comp.ticker];
+      if (!d) continue;
+
+      const sec = comp.sector || "Diğer";
+      if (!secValues[sec]) secValues[sec] = {};
+      const secObj = secValues[sec];
+
+      for (let j = 0; j < keys.length; j++){
+          const k = keys[j];
+          const v = d[k]; // Direkt map'ten oku
+          
+          if (v !== undefined && v !== null) {
+              // Yüzde düzeltmesi (Performans için burada basit kontrol)
+              let finalVal = v;
+              // NOT: Ham veride yüzde 0.15 geliyorsa ve biz 15 istiyorsak:
+              // Burada global bir kural uygulayabiliriz ama şimdilik ham veri alalım.
+              // (Screener mantığında küçükse çarpma işini render'da yaparız)
+              
+              (secObj[k] ||= []).push(finalVal);
+              (globValues[k] ||= []).push(finalVal);
+          }
+      }
+  }
+
+  const getStats = (arr) => {
+    if (!arr || arr.length === 0) return { mean: null, median: null };
+    // Numeric sort (hızlı)
+    arr.sort((a,b) => a-b);
+    let sum = 0;
+    const len = arr.length;
+    for (let i=0; i<len; i++) sum += arr[i];
+    const mid = Math.floor(len/2);
+    const median = (len % 2) ? arr[mid] : (arr[mid-1] + arr[mid]) / 2;
+    return { mean: sum / len, median };
+  };
+
+  // İstatistikleri hesapla
+  for (const sec in secValues){
+    sectorStats[sec] = {};
+    for (let i=0;i<keys.length;i++){
+      const k = keys[i];
+      if (secValues[sec][k]) sectorStats[sec][k] = getStats(secValues[sec][k]);
+    }
+  }
+
+  for (let i=0;i<keys.length;i++){
+    const k = keys[i];
+    if (globValues[k]) globalStats[k] = getStats(globValues[k]);
+  }
+}
+
+// ------------------------------------------------
+// PERFORMANS OPTİMİZASYONU: ASYNC RENDER
+// ------------------------------------------------
+let __renderTimeout;
+
+function renderScreenerResults() {
+    // Debounce: Hızlı arka arkaya çağrılırsa (filtre yazarken), eskisini iptal et
+    if (__renderTimeout) clearTimeout(__renderTimeout);
+
+    const tbody = document.getElementById('screener-results-body');
+    if (!tbody) return;
+
+    // Hemen "Hesaplanıyor" göster
+    if (!isScreenerComputing) {
+        tbody.style.opacity = "0.5";
+    }
+
+    __renderTimeout = setTimeout(() => {
+        _renderScreenerResultsAsync(tbody);
+    }, 50); // 50ms gecikme ile UI'ın nefes almasını sağla
+}
+
+async function _renderScreenerResultsAsync(tbody) {
+    isScreenerComputing = true;
+
+    if (!activeMetrics || activeMetrics.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+              <td colspan="5" style="padding:40px; color:rgba(255,255,255,0.4); font-weight:600; text-align:center;">
+                <i class="fa-solid fa-filter" style="font-size:24px; margin-bottom:10px; display:block;"></i>
+                Sonuçları görmek için soldan metrik sürükleyip ekleyin.
+              </td>
+            </tr>`;
+        tbody.style.opacity = "1";
+        isScreenerComputing = false;
+        return;
+    }
+
+    // İstatistikleri güncelle (Gerekirse)
+    ensureScreenerStats();
+
+    const map = window.__FIN_MAP || {};
+    const sectorFilter = window.scSectorSelection;
+    const industryFilter = window.scIndustrySelection;
+    
+    // Chunking: Hesaplamayı parçalara böl
+    const chunkSize = 500; // Her seferinde 500 şirket işle
+    let rankedData = [];
+    
+    // 1. ADIM: HESAPLAMA (Chunked Loop)
+    for (let i = 0; i < processedData.length; i += chunkSize) {
+        const chunk = processedData.slice(i, i + chunkSize);
+        
+        // Bu chunk'ı işle
+        const chunkResults = chunk.map(comp => {
+            // -- FİLTRELEME (EN BAŞTA YAP - HIZ KAZANCI) --
+            if (sectorFilter && comp.sector !== sectorFilter) return null;
+            if (industryFilter && comp.industry !== industryFilter) return null;
+
+            let score = 0;
+            let matchDetails = [];
+            const d = map[comp.ticker] || {}; // Veriyi lookup yap
+
+            for (const metric of activeMetrics) {
+                let val = d[metric.dataKey];
+                
+                // Yüzde düzeltmesi (render anında)
+                if (metric.isPercent && val !== undefined && val !== null && Math.abs(val) < 5) {
+                    val = val * 100;
+                }
+
+                const statObj = comparisonMode === 'sector' 
+                    ? (sectorStats[comp.sector] ? sectorStats[comp.sector][metric.dataKey] : null) 
+                    : globalStats[metric.dataKey];
+                
+                const avg = statObj ? statObj[calculationMethod] : null;
+
+                if (val !== undefined && val !== null && avg !== undefined && avg !== null) {
+                    let isGood = false;
+                    
+                    if (metric.direction === 'low') {
+                        if (val > 0 && val < avg) isGood = true; 
+                    } 
+                    else if (metric.direction === 'high') {
+                        if (val > avg) isGood = true;
+                    }
+
+                    if (isGood) score++;
+                    matchDetails.push({ 
+                        id: metric.id,
+                        shortLabel: metric.dataKey, 
+                        val, 
+                        avg, 
+                        good: isGood, 
+                        isPercent: metric.isPercent 
+                    });
+                }
+            }
+            // Spread yerine manuel atama (daha hızlı)
+            return { 
+                ticker: comp.ticker, 
+                name: comp.name, 
+                sector: comp.sector, 
+                logourl: comp.logourl,
+                score, 
+                matchDetails 
+            };
+        }).filter(Boolean);
+
+        rankedData = rankedData.concat(chunkResults);
+
+        // UI'a nefes aldır (Yield to Main Thread)
+        await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    // 2. ADIM: SIRALAMA
+    rankedData.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+
+        // Eşitlik durumunda ilk metriğe göre sırala
+        for (const metric of activeMetrics) {
+            // matchDetails içinde bul (array find biraz yavaştır ama sadece eşit skorlarda çalışır)
+            const detA = a.matchDetails.find(x => x.id === metric.id);
+            const detB = b.matchDetails.find(x => x.id === metric.id);
+
+            const valA = detA ? detA.val : null;
+            const valB = detB ? detB.val : null;
+
+            const aValid = (valA !== null);
+            const bValid = (valB !== null);
+            
+            if (!aValid && bValid) return 1;
+            if (aValid && !bValid) return -1;
+            if (!aValid && !bValid) continue;
+
+            if (valA !== valB) {
+                if (metric.direction === 'low') {
+                    if (valA > 0 && valB <= 0) return -1;
+                    if (valA <= 0 && valB > 0) return 1;
+                    return valA - valB; 
+                } else {
+                    return valB - valA;
+                }
+            }
+        }
+        
+        return a.ticker.localeCompare(b.ticker);
+    });
+
+    // 3. ADIM: HTML OLUŞTURMA (Sadece ilk 50)
+    const displayLimit = 50; 
+    const dataToRender = rankedData.slice(0, displayLimit);
+
+    const htmlRows = dataToRender.map((comp, index) => {
+        // matchDetails zaten var, sadece activeMetrics sırasına göre diz
+        const sortedDetails = [];
+        // Performans için loop
+        for(const m of activeMetrics) {
+            const d = comp.matchDetails.find(x => x.id === m.id);
+            if(d) sortedDetails.push(d);
+        }
+
+        let detailsHtml = '';
+        if(sortedDetails.length > 0) {
+             const boxes = sortedDetails.map(d => {
+                 const className = d.good ? 'result-box good' : 'result-box bad';
+                 let valStr, avgStr;
+
+                 if (d.isPercent) {
+                     valStr = `%${Number(d.val).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
+                     avgStr = `%${Number(d.avg).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
+                 } else {
+                     valStr = finFormatMoneyCompact(d.val, { decimals: 1 });
+                     avgStr = finFormatMoneyCompact(d.avg, { decimals: 1 });
+                 }
+                 
+                 return `
+                    <div class="${className}">
+                        <div class="res-label" title="${d.shortLabel}">${d.shortLabel}</div>
+                        <div class="res-val">${valStr}</div>
+                        <div class="res-avg">${calculationMethod==='mean'?'ORT':'MED'}: ${avgStr}</div>
+                    </div>`;
+             }).join('');
+             detailsHtml = `<div style="display:flex; gap:4px; justify-content:flex-end; flex-wrap:wrap; align-items:center;">${boxes}</div>`;
+        }
+
+        const badgeClass = comp.score > 0 ? "score-badge active" : "score-badge inactive";
+        const logo = comp.logourl || ""; 
+
+        return `
+            <tr>
+                <td style="text-align:center; color:rgba(255,255,255,0.3); font-size:10px;">${index + 1}</td>
+                <td>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <img src="${logo}" style="width:24px; height:24px; object-fit:contain; background:#fff; border-radius:4px; padding:2px;" onerror="this.style.display='none'">
+                        <div>
+                            <div style="font-weight:700; color:#eee; font-size:13px;">${comp.ticker}</div>
+                            <div style="margin-top:4px;">
+                                <button class="fp-menu-btn" title="İşlemler" onclick="event.stopPropagation(); fpOpenRowMenu('${comp.ticker}', event)">
+                                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                                </button>
+                            </div>
+                            <div style="font-size:10px; color:rgba(255,255,255,0.4); text-transform:uppercase; margin-top:2px;">${comp.name}</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span style="font-size:9px; font-weight:700; background:rgba(255,255,255,0.06); padding:4px 8px; border-radius:4px; color:rgba(255,255,255,0.6); text-transform:uppercase;">${comp.sector}</span></td>
+                <td style="text-align:center;"><div class="${badgeClass}">${comp.score}</div></td>
+                <td style="text-align:right;">${detailsHtml}</td>
+            </tr>
+        `;
+    }).join('');
+
+    tbody.innerHTML = htmlRows;
+    if (rankedData.length > displayLimit) {
+        tbody.innerHTML += `<tr><td colspan="5" style="text-align:center; padding:10px; font-size:10px; color:#555;">...ve ${rankedData.length - displayLimit} şirket daha</td></tr>`;
+    }
+    
+    tbody.style.opacity = "1";
+    isScreenerComputing = false;
+}
+
+// ------------------------------------------------
+// UI EVENTS
+// ------------------------------------------------
 
 function scUpdateFilterBadges() {
     const area = document.getElementById("scActiveFiltersArea");
@@ -121,8 +463,6 @@ function scUpdateFilterBadges() {
     `;
 
     // C. ALT SEKTÖR BADGE
-    const indDisabledClass = !hasSector ? 'opacity-50 pointer-events-none grayscale' : '';
-    
     html += `
         <div style="position:relative; display:inline-block;">
             <div class="sc-badge ${hasIndustry ? 'active' : ''}" style="${!hasSector ? 'opacity:0.4; pointer-events:none;' : ''}"
@@ -179,14 +519,6 @@ function scUpdateFilterBadges() {
     area.innerHTML = html;
 }
 
-function _renderScreenerUI() {
-    try { processScreenerData(); } catch(e) { console.error(e); }
-    try { renderMetricsPool(); } catch(e) {}
-    try { renderScreenerResults(); } catch(e) {}
-    try { setupDragAndDrop(); } catch(e) {}
-    try { scUpdateFilterBadges(); } catch(e) { console.error("Badge hatası:", e); }
-}
-
 function scToggleCompMode() {
     const newMode = (comparisonMode === 'sector') ? 'global' : 'sector';
     setComparisonMode(newMode);
@@ -205,92 +537,6 @@ function scToggleMarketPopup(e) {
         const isVisible = pop.style.display === "block";
         pop.style.display = isVisible ? "none" : "block";
     }
-}
-
-function processScreenerData() {
-    const map = window.__FIN_MAP || {};
-    const defMap = {};
-    METRIC_DEFINITIONS.forEach(m => defMap[m.dataKey] = m);
-
-    processedData = window.companies
-        .filter(c => c.group === window.activeGroup) 
-        .map(comp => {
-            const ticker = comp.ticker;
-            const rawMetrics = map[ticker] || {};
-            const preparedMetrics = {};
-
-            for (const [key, val] of Object.entries(rawMetrics)) {
-                if (val === null || val === undefined) continue;
-                
-                let finalVal = val;
-                const def = defMap[key];
-                
-                if (def && def.isPercent && Math.abs(finalVal) < 5) {
-                    finalVal = finalVal * 100;
-                }
-                
-                preparedMetrics[key] = finalVal;
-            }
-
-            return { ...comp, ...preparedMetrics, score: 0, matches: [] };
-        });
-}
-
-let __screenerStatsKey = "";
-
-function ensureScreenerStats(){
-  const keys = (activeMetrics || []).map(m => m.dataKey).filter(Boolean);
-  keys.sort();
-
-  const keyStr = `${window.activeGroup}|${keys.join(",")}`;
-  if (__screenerStatsKey === keyStr) return;   
-  __screenerStatsKey = keyStr;
-
-  sectorStats = {};
-  globalStats = {};
-
-  if (!keys.length) return;
-
-  const secValues = {};
-  const globValues = {};
-
-  for (const comp of (processedData || [])) {
-    const sec = comp.sector || "Diğer";
-    if (!secValues[sec]) secValues[sec] = {};
-    const secObj = secValues[sec];
-
-    for (let i=0; i<keys.length; i++){
-      const k = keys[i];
-      const v = comp[k];
-      if (v === undefined || v === null) continue;
-
-      (secObj[k] ||= []).push(v);
-      (globValues[k] ||= []).push(v);
-    }
-  }
-
-  const getStats = (arr) => {
-    if (!arr || arr.length === 0) return { mean: null, median: null };
-    arr.sort((a,b) => a-b);
-    let sum = 0;
-    for (let i=0;i<arr.length;i++) sum += arr[i];
-    const mid = Math.floor(arr.length/2);
-    const median = (arr.length % 2) ? arr[mid] : (arr[mid-1] + arr[mid]) / 2;
-    return { mean: sum / arr.length, median };
-  };
-
-  for (const sec in secValues){
-    sectorStats[sec] = {};
-    for (let i=0;i<keys.length;i++){
-      const k = keys[i];
-      if (secValues[sec][k]) sectorStats[sec][k] = getStats(secValues[sec][k]);
-    }
-  }
-
-  for (let i=0;i<keys.length;i++){
-    const k = keys[i];
-    if (globValues[k]) globalStats[k] = getStats(globValues[k]);
-  }
 }
 
 function setComparisonMode(mode) {
@@ -338,15 +584,16 @@ window.scBuildList = function(type){
 
     let items = [];
     
+    // Aktif gruptaki şirketlerden listeyi oluştur
     if (type === 'sector') {
-        items = [...new Set(window.companies
+        items = [...new Set((window.companies || [])
             .filter(c => c.group === window.activeGroup)
             .map(c => c.sector))]
             .filter(Boolean)
             .sort((a,b) => a.localeCompare(b,'tr'));
     } else {
         if(!window.scSectorSelection) return;
-        items = [...new Set(window.companies
+        items = [...new Set((window.companies || [])
             .filter(c => c.group === window.activeGroup && c.sector === window.scSectorSelection)
             .map(c => c.industry))]
             .filter(Boolean)
@@ -451,159 +698,9 @@ document.addEventListener("click", (e) => {
 
 function filterMetrics() { renderMetricsPool(); }
 
-function renderScreenerResults() {
-    const tbody = document.getElementById('screener-results-body');
-    if (!tbody) return;
-
-    if (!activeMetrics || activeMetrics.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-              <td colspan="5" style="padding:40px; color:rgba(255,255,255,0.4); font-weight:600; text-align:center;">
-                <i class="fa-solid fa-filter" style="font-size:24px; margin-bottom:10px; display:block;"></i>
-                Sonuçları görmek için soldan metrik sürükleyip ekleyin.
-              </td>
-            </tr>`;
-        return;
-    }
-
-    ensureScreenerStats();
-
-    const rankedData = processedData.map(comp => {
-        let score = 0;
-        let matchDetails = [];
-        
-        if (window.scSectorSelection && comp.sector !== window.scSectorSelection) {
-            return null; 
-        }
-        if (window.scIndustrySelection && comp.industry !== window.scIndustrySelection) {
-            return null;
-        }
-
-        activeMetrics.forEach(metric => {
-            const val = comp[metric.dataKey];
-            const statObj = comparisonMode === 'sector' 
-                ? (sectorStats[comp.sector] ? sectorStats[comp.sector][metric.dataKey] : null) 
-                : globalStats[metric.dataKey];
-            
-            const avg = statObj ? statObj[calculationMethod] : null;
-
-            if (val !== undefined && val !== null && avg !== undefined && avg !== null) {
-                let isGood = false;
-                
-                if (metric.direction === 'low') {
-                    if (val > 0 && val < avg) isGood = true; 
-                } 
-                else if (metric.direction === 'high') {
-                    if (val > avg) isGood = true;
-                }
-
-                if (isGood) score++;
-                matchDetails.push({ 
-                    id: metric.id,
-                    shortLabel: metric.dataKey, 
-                    val, 
-                    avg, 
-                    good: isGood, 
-                    isPercent: metric.isPercent 
-                });
-            }
-        });
-        return { ...comp, score, matchDetails };
-    }).filter(Boolean);
-
-    rankedData.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-
-        for (const metric of activeMetrics) {
-            const valA = a[metric.dataKey];
-            const valB = b[metric.dataKey];
-
-            const aValid = (valA !== null && valA !== undefined);
-            const bValid = (valB !== null && valB !== undefined);
-            if (!aValid && bValid) return 1;
-            if (aValid && !bValid) return -1;
-            if (!aValid && !bValid) continue;
-
-            if (valA !== valB) {
-                if (metric.direction === 'low') {
-                    if (valA > 0 && valB <= 0) return -1;
-                    if (valA <= 0 && valB > 0) return 1;
-                    return valA - valB; 
-                } else {
-                    return valB - valA;
-                }
-            }
-        }
-        
-        return a.ticker.localeCompare(b.ticker);
-    });
-
-    const displayLimit = 50; 
-    const dataToRender = rankedData.slice(0, displayLimit);
-
-    const htmlRows = dataToRender.map((comp, index) => {
-        let detailsHtml = '';
-        
-        const sortedDetails = activeMetrics.map(m => comp.matchDetails.find(d => d.id === m.id)).filter(Boolean);
-
-        if(sortedDetails.length > 0) {
-             const boxes = sortedDetails.map(d => {
-                 const className = d.good ? 'result-box good' : 'result-box bad';
-                 let valStr, avgStr;
-
-                 if (d.isPercent) {
-                     valStr = `%${Number(d.val).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
-                     avgStr = `%${Number(d.avg).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
-                 } else {
-                     valStr = finFormatMoneyCompact(d.val, { decimals: 1 });
-                     avgStr = finFormatMoneyCompact(d.avg, { decimals: 1 });
-                 }
-                 
-                 return `
-                    <div class="${className}">
-                        <div class="res-label" title="${d.shortLabel}">${d.shortLabel}</div>
-                        <div class="res-val">${valStr}</div>
-                        <div class="res-avg">${calculationMethod==='mean'?'ORT':'MED'}: ${avgStr}</div>
-                    </div>`;
-             }).join('');
-             detailsHtml = `<div style="display:flex; gap:4px; justify-content:flex-end; flex-wrap:wrap; align-items:center;">${boxes}</div>`;
-        }
-
-        const badgeClass = comp.score > 0 ? "score-badge active" : "score-badge inactive";
-        const logo = comp.logourl || ""; 
-
-        return `
-            <tr>
-                <td style="text-align:center; color:rgba(255,255,255,0.3); font-size:10px;">${index + 1}</td>
-                <td>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <img src="${logo}" style="width:24px; height:24px; object-fit:contain; background:#fff; border-radius:4px; padding:2px;" onerror="this.style.display='none'">
-                        <div>
-                            <div style="font-weight:700; color:#eee; font-size:13px;">${comp.ticker}</div>
-                            <div style="margin-top:4px;">
-                                <button class="fp-menu-btn" title="İşlemler" onclick="event.stopPropagation(); fpOpenRowMenu('${comp.ticker}', event)">
-                                    <i class="fa-solid fa-ellipsis-vertical"></i>
-                                </button>
-                            </div>
-                            <div style="font-size:10px; color:rgba(255,255,255,0.4); text-transform:uppercase; margin-top:2px;">${comp.name}</div>
-                        </div>
-                    </div>
-                </td>
-                <td><span style="font-size:9px; font-weight:700; background:rgba(255,255,255,0.06); padding:4px 8px; border-radius:4px; color:rgba(255,255,255,0.6); text-transform:uppercase;">${comp.sector}</span></td>
-                <td style="text-align:center;"><div class="${badgeClass}">${comp.score}</div></td>
-                <td style="text-align:right;">${detailsHtml}</td>
-            </tr>
-        `;
-    }).join('');
-
-    tbody.innerHTML = htmlRows;
-    if (rankedData.length > displayLimit) {
-        tbody.innerHTML += `<tr><td colspan="5" style="text-align:center; padding:10px; font-size:10px; color:#555;">...ve ${rankedData.length - displayLimit} şirket daha</td></tr>`;
-    }
-}
-
 function setupDragAndDrop() {
     const container = document.querySelector('.drop-zone-container');
+    if(!container) return;
     
     container.ondragover = e => { 
         e.preventDefault(); 
