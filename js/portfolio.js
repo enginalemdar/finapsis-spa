@@ -3,39 +3,20 @@
 (function() {
   const CFG = window.FINAPSIS_CONFIG || {};
 
-  let BUBBLE_USER_ID = String((CFG.BUBBLE_USER_ID || window.BUBBLE_USER_ID || window.BUBBLE_USERID || '')).trim();
-  let BUBBLE_USER_NAME = String((CFG.BUBBLE_USER_NAME || window.BUBBLE_USERNAME || window.BUBBLE_USER_NAME || '')).trim();
-  let BUBBLE_API_TOKEN = String((CFG.BUBBLE_API_TOKEN || window.BUBBLE_API_TOKEN || '')).trim();
-
-  // bubble.html → postMessage({ type: "FIN_SESSION", payload: { user_id, email, plan } })
-  window.addEventListener("message", function(ev) {
-    if (!ev.data || ev.data.type !== "FIN_SESSION") return;
-    const p = ev.data.payload || {};
-    const uid = String(p.user_id || "").trim();
-    if (!uid) return;
-    if (uid === BUBBLE_USER_ID) return; // zaten set edilmiş
-
-    BUBBLE_USER_ID = uid;
-    BUBBLE_USER_NAME = String(p.email || p.name || "User").trim();
-    BUBBLE_API_TOKEN = String(p.token || "").trim();
-    console.log("[PF] FIN_SESSION alındı, user_id:", uid);
-
-    // user henüz set edilmemişse (auth ekranında bekleniyorsa) otomatik başlat
-    if (!state.user) {
-      state.user = { id: BUBBLE_USER_ID, name: BUBBLE_USER_NAME };
-      if (BUBBLE_API_TOKEN) state.token = BUBBLE_API_TOKEN;
-      refreshData();
-    }
-  });
+  const BUBBLE_USER_ID = String((CFG.BUBBLE_USER_ID || window.BUBBLE_USER_ID || window.BUBBLE_USERID || '')).trim();
+  const BUBBLE_USER_NAME = String((CFG.BUBBLE_USER_NAME || window.BUBBLE_USERNAME || window.BUBBLE_USER_NAME || '')).trim();
+  const BUBBLE_API_TOKEN = String((CFG.BUBBLE_API_TOKEN || window.BUBBLE_API_TOKEN || '')).trim();
 
   const API_BASE = String((CFG.API_BASE || 'https://eap-35848.bubbleapps.io/api/1.1/wf')).replace(/\/\s*$/, '');
   const GOOGLE_CLIENT_ID = String((CFG.GOOGLE_CLIENT_ID || '')).trim();
   const REDIRECT_URI = String((CFG.REDIRECT_URI || window.location.href.split('?')[0])).trim();
 
-  // Fiyatlar her zaman window.currentPriceData / window.prevPriceData üzerinden okunur
-  // (pfRefreshPricesFromProxy bu global objectleri günceller)
-  const getPrice = (ticker) => Number(window.currentPriceData && window.currentPriceData[ticker]) || 0;
-  const getPrevPrice = (ticker) => Number(window.prevPriceData && window.prevPriceData[ticker]) || 0;
+  const currentPriceData = window.currentPriceData || {};
+  const prevPriceData = window.prevPriceData || {};
+
+  let prices = {}, prevPrices = {};
+  for(let k in currentPriceData) prices[k] = parseFloat(currentPriceData[k]);
+  for(let k in prevPriceData) prevPrices[k] = parseFloat(prevPriceData[k]);
 
 let __priceInFlight = false; 
 
@@ -117,28 +98,12 @@ window.pfRefreshPricesFromProxy = pfRefreshPricesFromProxy;
 
   let charts = {};
 
-  // O(1) ticker lookup — companies yüklenince map'ı build
-  let __pfCompMap = null;
-  function pfGetCompMap() {
-    if (__pfCompMap) return __pfCompMap;
-    __pfCompMap = {};
-    (window.companies || []).forEach(c => { __pfCompMap[String(c.ticker).toUpperCase()] = c; });
-    return __pfCompMap;
-  }
-  // companies değişince cache invalidate
-  const __origEnsure = window.finEnsureCompanies;
-  window.finEnsureCompanies = function() {
-    const before = (window.companies || []).length;
-    if (__origEnsure) __origEnsure();
-    if ((window.companies || []).length !== before) __pfCompMap = null;
-  };
-
-  const getItem = (ticker) => pfGetCompMap()[String(ticker || '').toUpperCase()] || null;
+  const getItem = (ticker) => (window.companies || []).find(c => c.ticker === ticker);
   const getGroup = (ticker) => getItem(ticker)?.group;
 
   const isUSD = (ticker) => {
     const item = getItem(ticker);
-    return item && (item.group === 'sp' || item.group === 'emtia' || item.group === 'kripto');
+    return item && (item.group === 'nyse' || item.group === 'nasdaq' || item.group === 'emtia' || item.group === 'kripto');
   };
 
   const getSym = (ticker) => isUSD(ticker) ? '$' : '₺';
@@ -264,8 +229,6 @@ window.pfRefreshPricesFromProxy = pfRefreshPricesFromProxy;
   async function refreshData() {
     document.getElementById('mainPanel').innerHTML = `<div class="loader-wrap"><div class="spinner"></div><p>Veriler Yükleniyor...</p></div>`;
     const res = await api('portfolio-list', { user: state.user.id });
-    // Fiyat refresh paralel başlat — detay beklenirken fiyatlar hazırlanırken
-    pfRefreshPricesFromProxy();
 
     if(res.status === "success") {
       state.portfolios = res.response.portfolios || [];
@@ -346,7 +309,7 @@ document.addEventListener("visibilitychange", () => {
   return v ? v : "Diğer";
 }
 function pfCanSectorFilter(){
-  return state.activeGroup === "bist" || state.activeGroup === "sp";
+  return state.activeGroup === "bist";
 }
 
 window.pfBuildSectorList = function(){
@@ -473,7 +436,7 @@ const filtered = (window.companies || []).filter(c => {
 });
 
     list.innerHTML = filtered.map(c => {
-      const cur = getPrice(c.ticker) || 0; const prev = getPrevPrice(c.ticker) || cur;
+      const cur = prices[c.ticker] || 0; const prev = prevPrices[c.ticker] || cur;
       let change = 0; if (prev > 0) change = ((cur - prev) / prev) * 100;
       const color = change >= 0 ? 'text-green' : 'text-red';
       const sign = change > 0 ? '+' : '';
@@ -526,13 +489,13 @@ window.pfHasPosition = function(ticker){
     const positions = (data.positions || []).filter(p => (Number(p.quantity) || 0) > 0);
     const transactions = data.transactions || [];
     const cash = state.cashBalance;
-    const usdRate = getPrice('USDTRY') || 1;
+    const usdRate = prices['USDTRY'] || 1;
 
     let stockValTRY = 0, totalCostTRY = 0, dayGainTRY = 0;
 
     positions.forEach(pos => {
-      const curPrice = getPrice(pos.ticker) || pos.avg_cost;
-      const prevPrice = getPrevPrice(pos.ticker) || curPrice;
+      const curPrice = prices[pos.ticker] || pos.avg_cost;
+      const prevPrice = prevPrices[pos.ticker] || curPrice;
       const isU = isUSD(pos.ticker);
 
       const mVal = curPrice * pos.quantity;
@@ -555,7 +518,7 @@ window.pfHasPosition = function(ticker){
     const assetRows = positions.map(pos => {
       const sym = getSym(pos.ticker);
       const isU = isUSD(pos.ticker);
-      const cur = getPrice(pos.ticker) || pos.avg_cost;
+      const cur = prices[pos.ticker] || pos.avg_cost;
       const item = getItem(pos.ticker) || {};
 const nm = item.name || "";
 
@@ -867,7 +830,7 @@ document.addEventListener('click', function(){
 
     document.getElementById('tradeModal').style.display = 'flex';
     document.getElementById('modalTicker').innerText = t;
-    document.getElementById('modalPrice').innerText = `${sym}${(getPrice(t)||0).toFixed(2)}`;
+    document.getElementById('modalPrice').innerText = `${sym}${(prices[t]||0).toFixed(2)}`;
     document.getElementById('modalImg').src = item ? item.logourl : '';
 
     const pfSelect = document.getElementById('modalPortfolioSelect');
@@ -962,10 +925,10 @@ document.addEventListener('click', function(){
   window.pfCalcTotal = function() {
     const raw = parseFloat(document.getElementById('tradeQty').value);
     const t = state.trade.ticker;
-    const price = getPrice(t) || 0;
+    const price = prices[t] || 0;
     const sym = getSym(t);
     const isU = isUSD(t);
-    const usdRate = getPrice('USDTRY') || 1;
+    const usdRate = prices['USDTRY'] || 1;
 
     const el = document.getElementById('tradeTotal');
     const elTry = document.getElementById('tradeTotalTry');
@@ -1048,13 +1011,13 @@ document.addEventListener('click', function(){
     const ticker = state.trade.ticker;
     const portfolioId = state.trade.portfolioId;
 
-    const price = getPrice(ticker) || 0;
+    const price = prices[ticker] || 0;
     if (!raw || raw <= 0 || price <= 0) { alert("Geçersiz giriş."); return; }
 
     const qty = (state.trade.inputMode === 'amount') ? (raw / price) : raw;
 
     const isU = isUSD(ticker);
-    const usdRate = getPrice('USDTRY') || 1;
+    const usdRate = prices['USDTRY'] || 1;
     const currency = isU ? "USD" : "TRY";
     const rate = isU ? usdRate : 1;
     const tryPrice = price * rate;
@@ -1273,11 +1236,11 @@ const getPortfolioCash = (pfId) => {
 };
 
 const getDetailUrl = (ticker) => {
-  const item = getItem(ticker);
+  const item = getItem(ticker) || (window.companies || []).find(c => c.ticker === ticker);
   if(!item) return null;
 
   const slug = (item.slug || ticker || "").toString().toLowerCase();
-  const isCompany = (item.group === "bist" || item.group === "sp");
+  const isCompany = (item.group === "bist" || item.group === "nyse" || item.group === "nasdaq");
   const root = isCompany ? "https://finapsis.co/comdetail/" : "https://finapsis.co/itemdetail/";
   return root + encodeURIComponent(slug);
 };
@@ -1422,7 +1385,7 @@ window.pfOnTransferFromChange = async function(fromId) {
     return;
   }
 
-  const price = getPrice(t) || 0;
+  const price = prices[t] || 0;
   if (price <= 0) {
     alert("Fiyat bulunamadı.");
     btn.innerText = "VİRMAN YAP";
@@ -1431,7 +1394,7 @@ window.pfOnTransferFromChange = async function(fromId) {
   }
 
   const isU = isUSD(t);
-  const usdRate = getPrice('USDTRY') || 1;
+  const usdRate = prices['USDTRY'] || 1;
   const currency = isU ? "USD" : "TRY";
   const rate = isU ? usdRate : 1;
   const tryPrice = price * rate;
@@ -1531,7 +1494,7 @@ window.pfOnTransferFromChange = async function(fromId) {
     if(ctxAlloc && (pos.length > 0 || cash > 0)) {
       const lbl = pos.map(p=>p.ticker);
       const dt = pos.map(p=>{
-        const cur = getPrice(p.ticker)||0;
+        const cur = prices[p.ticker]||0;
         const val = cur*p.quantity;
         return isUSD(p.ticker)?val*usdRate:val;
       });
@@ -1548,7 +1511,7 @@ window.pfOnTransferFromChange = async function(fromId) {
     if(ctxPnl && pos.length > 0) {
       const plbl = pos.map(p=>p.ticker);
       const pdt = pos.map(p=>{
-        const cur=getPrice(p.ticker)||0;
+        const cur=prices[p.ticker]||0;
         const diff=(cur*p.quantity)-(p.avg_cost*p.quantity);
         return isUSD(p.ticker)?diff*usdRate:diff;
       });
@@ -1610,10 +1573,5 @@ window.addEventListener("load", () => {
 
 })();
 
-  window.pfInitOnce = function() {
-    if (typeof finEnsureCompanies === "function") finEnsureCompanies();
-    init();
-  };
-
-  window.pfInitOnce();
+  init();
 })();
