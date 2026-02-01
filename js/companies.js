@@ -114,6 +114,12 @@ function renderCompanyList() {
   const append = (__clAppendRequested && key === __clLastKey);
   __clAppendRequested = false;
 
+  // Key aynı, append yok, tablo zaten render edildi → sadece fiyatları in-place güncelle
+  if (!append && key === __clLastKey && __clRenderedCount > 0) {
+    clUpdatePricesInPlace();
+    return;
+  }
+
   if (!append) {
     tbody.innerHTML = "";
     __clRenderedCount = 0;
@@ -196,12 +202,12 @@ function renderCompanyList() {
   const countEl = document.getElementById('cl-count');
   if (countEl) {
     if (isGlobalSearch) {
-      countEl.textContent = `${filteredTotal.toLocaleString('tr-TR')} sonuç`;
+      countEl.textContent = `${filteredTotal.toLocaleString('tr-TR')} Sonuç`;
     } else {
       const totalInGroup = (window.companies || []).filter(c => c.group === window.activeGroup).length;
       countEl.textContent = filteredTotal < totalInGroup
-        ? `${filteredTotal.toLocaleString('tr-TR')} / ${totalInGroup.toLocaleString('tr-TR')} şirket`
-        : `${totalInGroup.toLocaleString('tr-TR')} şirket`;
+        ? `${filteredTotal.toLocaleString('tr-TR')} / ${totalInGroup.toLocaleString('tr-TR')} Şirket`
+        : `${totalInGroup.toLocaleString('tr-TR')} Şirket`;
     }
   }
 
@@ -247,6 +253,7 @@ function renderCompanyList() {
       }
 
       const tr = document.createElement("tr");
+      tr.setAttribute('data-ticker', c.ticker);
 
       tr.innerHTML = `
         <td>
@@ -536,7 +543,7 @@ window.clUpdateFilterBadges = function() {
                 FİLTRE
                 ${hasActiveRange ? '<i class="fa-solid fa-xmark" onclick="clClearAllRanges(event)" style="opacity:0.6;"></i>' : '<i class="fa-solid fa-chevron-down" style="font-size:10px; opacity:0.5;"></i>'}
             </div>
-            <div id="clPopup_filter" class="cl-popup-menu" style="width:320px; max-height:460px; overflow-y:auto;" onclick="event.stopPropagation()">
+            <div id="clPopup_filter" class="cl-popup-menu" style="width:380px; max-height:500px; overflow-y:auto;" onclick="event.stopPropagation()">
                 <div style="padding:12px 14px 6px; display:flex; justify-content:space-between; align-items:center;">
                     <span style="font-size:11px; font-weight:800; color:#fff; text-transform:uppercase; letter-spacing:0.5px;">Detaylı Filtre</span>
                     <button onclick="clClearAllRanges(event)" style="background:none; border:none; color:#c2f50e; font-size:11px; font-weight:700; cursor:pointer; padding:0;">Temizle</button>
@@ -711,3 +718,30 @@ window.clClearAllRanges = function(e) {
   clUpdateFilterBadges();
   renderCompanyList();
 };
+
+// Sadece fiyat sütunlarını in-place günceller - scroll/layout bozmaz
+function clUpdatePricesInPlace() {
+  const rows = document.querySelectorAll('#cl-tbody tr');
+  rows.forEach(tr => {
+    const ticker = tr.getAttribute('data-ticker');
+    if (!ticker) return;
+
+    const price = (window.currentPriceData || {})[ticker] || 0;
+    const prev = (window.prevPriceData || {})[ticker] || price;
+    if (price <= 0) return;
+
+    const priceTd = tr.children[1]; // 2. sütun = fiyat
+    if (!priceTd) return;
+
+    const diff = price - prev;
+    const isUp = diff > 0;
+    const isDown = diff < 0;
+    const colorClass = isUp ? 'val-up' : (isDown ? 'val-down' : '');
+    const icon = isUp ? '<i class="fa-solid fa-caret-up"></i>' : (isDown ? '<i class="fa-solid fa-caret-down"></i>' : '');
+
+    const c = (window.companies || []).find(x => x.ticker === ticker);
+    const sym = (c && ['sp','nyse','nasdaq','doviz','emtia','kripto'].includes(c.group)) ? '$' : '₺';
+
+    priceTd.innerHTML = `<div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; font-weight:700;" class="${colorClass}">${icon} <span>${sym}${price.toLocaleString("tr-TR", {minimumFractionDigits:2, maximumFractionDigits:2})}</span></div>`;
+  });
+}
