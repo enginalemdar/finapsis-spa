@@ -565,6 +565,15 @@ async function finBuildMapForActiveGroup(done) {
         
         updateScreenerLoadingState(false);
 
+        // Yükleme sırasında grup değiştiyse: eski waiters'ı boşalt, yeni grup için başlat
+        const nowGroup = String(window.activeGroup || "bist");
+        if (nowGroup !== g) {
+            console.log(`🔄 [METRICS] Grup yükleme sırasında değişti: ${g} → ${nowGroup}`);
+            window.__FIN_METRICS_WAITERS.splice(0); // eski grup waiters'ı temizle
+            finBuildMapForActiveGroup(); // yeni grup için tekrar başlat
+            return;
+        }
+
         // Bekleyen işleri çalıştır
         const q = (window.__FIN_METRICS_WAITERS || []).splice(0);
         q.forEach(fn => { try { fn(); } catch (e) {} });
@@ -855,7 +864,7 @@ function setGroup(group) {
           try {
             if (activeTab === 'screener.html' && typeof initScreener === "function") initScreener();
             else if (activeTab === 'companieslist.html' && typeof renderCompanyList === "function") renderCompanyList();
-            else if (activeTab === 'sectors' && window.secRenderTable) window.secRenderTable();
+            else if (activeTab === 'sectors' && window.secInitOnce) window.secInitOnce();
             else if (activeTab === 'karsilastirma.html' && window.cmpRender) window.cmpRender();
             else if (activeTab === 'diagrams' && window.dgRender) window.dgRender();
           } catch(e) { console.error(e); }
