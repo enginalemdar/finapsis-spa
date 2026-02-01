@@ -1,0 +1,116 @@
+<div class="view-section" id="view-portfolio">
+<div id="app">
+<div class="left-panel">
+<div class="header-bar">
+<div style="font-weight:700; font-size:18px; display:flex; align-items:center; gap:10px;">
+         Finapsis Sanal Portföy
+      </div>
+</div>
+<div class="search-box" id="pfSearchBox">
+<i class="fa-solid fa-search search-icon"></i>
+<input id="searchInput" oninput="pfRenderMarketList()" placeholder="Hisse, Döviz, Emtia ara." type="text"/>
+<!-- ✅ Sektör filtre ikonu -->
+<button class="pf-filter-btn" id="pfSectorBtn" onclick="pfToggleSectorPopup(event)" title="Sektör Filtrele">
+<i class="fa-solid fa-filter"></i>
+</button>
+<!-- ✅ Popup (ikonun yanında açılır) -->
+<div class="pf-sector-popup" id="pfSectorPopup" style="display:none;">
+<div class="pf-sector-head">
+<div class="pf-sector-title">Sektör</div>
+<div class="pf-sector-actions">
+<button class="pf-sector-clear" onclick="pfClearSectorFilter(event)">Temizle</button>
+<i class="fa-solid fa-xmark pf-sector-close" onclick="pfCloseSectorPopup(event)"></i>
+</div>
+</div>
+<div style="padding: 8px; border-bottom:1px solid rgba(255,255,255,0.1);">
+<input id="pfSectorSearchInput" onclick="event.stopPropagation()" oninput="pfFilterSectorList(this.value)" placeholder="Sektör ara..." style="width:100%; background:#1a1a1a; border:1px solid #333; color:#fff; padding:8px 10px; border-radius:8px; font-size:12px; outline:none; font-weight:600;" type="text"/>
+</div>
+<div class="pf-sector-list" id="pfSectorList"></div>
+</div>
+</div>
+<div class="category-menu">
+<div class="cat-item active" onclick="pfSetGroup('bist', this)">BIST</div>
+<div class="cat-item" onclick="pfSetGroup('nyse', this)">NYSE</div>
+<div class="cat-item" onclick="pfSetGroup('nasdaq', this)">NASDAQ</div>
+<div class="cat-item" onclick="pfSetGroup('doviz', this)">Döviz</div>
+<div class="cat-item" onclick="pfSetGroup('emtia', this)">Emtia</div>
+<div class="cat-item" onclick="pfSetGroup('kripto', this)">Kripto</div>
+</div>
+<div class="market-list" id="marketList"></div>
+</div>
+<div class="right-panel" id="mainPanel"></div>
+</div>
+<!-- TRADE MODAL -->
+<div class="modal-overlay" id="tradeModal">
+<div class="trade-modal">
+<div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+<h3 style="margin:0;">İşlem Emri</h3>
+<i class="fa-solid fa-xmark" onclick="pfCloseTradeModal()" style="cursor:pointer; color:#666;"></i>
+</div>
+<!-- NEW: all-mode portfolio selector (hidden normally) -->
+<select class="portfolio-select" id="modalPortfolioSelect" onchange="pfSetTradePortfolio(this.value)" style="min-width:100%; width:100%; margin-bottom:12px; display:none;"></select>
+<div style="display:flex; background:#000; padding:4px; border-radius:12px; margin-bottom:15px;">
+<div class="trade-tab-btn" id="tabBuy" onclick="pfUserClickSide('buy')">AL</div>
+<div class="trade-tab-btn" id="tabSell" onclick="pfUserClickSide('sell')">SAT</div>
+</div>
+<!-- Input Mode Toggle -->
+<div style="display:flex; background:#000; padding:4px; border-radius:12px; margin-bottom:25px; border:1px solid #222;">
+<div class="trade-tab-btn" id="modeQty" onclick="pfSetInputMode('qty')">MİKTAR</div>
+<div class="trade-tab-btn" id="modeAmt" onclick="pfSetInputMode('amount')">TUTAR</div>
+</div>
+<div style="display:flex; align-items:center; gap:15px; margin-bottom:25px;">
+<img id="modalImg" src="" style="width:48px; height:48px; background:#fff; border-radius:10px; padding:4px;"/>
+<div>
+<div id="modalTicker" style="font-weight:800; font-size:20px;">-</div>
+<div id="modalPrice" style="font-size:16px; color:var(--primary); font-weight:600;">-</div>
+</div>
+</div>
+<div id="modalLimit" style="font-size:12px; color:#888; text-align:right; margin-bottom:6px;">-</div>
+<input class="form-input" id="tradeQty" oninput="pfCalcTotal()" placeholder="Miktar..." type="number"/>
+<div id="tradeHint" style="font-size:11px; color:#666; margin:-6px 0 12px 0; text-align:right;"></div>
+<div style="display:flex; justify-content:space-between; padding:15px; background:#000; border-radius:12px; margin-bottom:20px; border:1px solid #222;">
+<span style="color:#888; font-size:13px;">Tahmini Tutar</span>
+<div style="text-align:right;">
+<span id="tradeTotal" style="font-weight:700; font-size:15px; display:block;">0.00</span>
+<span id="tradeTotalTry" style="font-size:11px; color:#666; display:block;"></span>
+</div>
+</div>
+<button class="btn btn-primary" disabled="" id="btnConfirmTrade" onclick="pfSubmitTrade()" style="width:100%;">EMRİ GÖNDER</button>
+</div>
+</div>
+<!-- TRANSFER (VIRMAN) MODAL -->
+<div class="modal-overlay" id="transferModal">
+<div class="trade-modal">
+<div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+<h3 style="margin:0;">Virman</h3>
+<i class="fa-solid fa-xmark" onclick="pfCloseTransferModal()" style="cursor:pointer; color:#666;"></i>
+</div>
+<div style="font-size:12px; color:#888; margin-bottom:6px;">Kaynak Portföy</div>
+<select class="portfolio-select" id="trFrom" onchange="pfOnTransferFromChange(this.value)" style="min-width:100%; width:100%; margin-bottom:12px;"></select>
+<div style="font-size:12px; color:#888; margin-bottom:6px;">Hedef Portföy</div>
+<select class="portfolio-select" id="trTo" style="min-width:100%; width:100%; margin-bottom:12px;"></select>
+<div style="font-size:12px; color:#888; margin-bottom:6px;">Enstrüman</div>
+<select class="portfolio-select" id="trTicker" onchange="pfUpdateTransferLimit()" style="min-width:100%; width:100%; margin-bottom:12px;"></select>
+<div id="trLimit" style="font-size:12px; color:#888; margin-bottom:6px; text-align:right;">-</div>
+<input class="form-input" id="trQty" oninput="pfValidateTransfer()" placeholder="Miktar giriniz..." type="number"/>
+<button class="btn btn-primary" disabled="" id="btnConfirmTransfer" onclick="pfSubmitTransfer()" style="width:100%;">VİRMAN YAP</button>
+<button class="btn" onclick="pfCloseTransferModal()" style="width:100%; background:#222; color:#fff; margin-top:10px;">İptal</button>
+</div>
+</div>
+<!-- HISTORY MODAL -->
+<div class="modal-overlay" id="pfHistModal">
+<div class="hist-modal">
+<div class="hist-head">
+<div>
+<div class="hist-title" id="pfHistTitle">-</div>
+<div class="hist-sub" id="pfHistSub">-</div>
+</div>
+<i class="fa-solid fa-xmark hist-close" onclick="pfCloseHistoryModal()"></i>
+</div>
+<div class="hist-body">
+<div class="hist-loading" id="pfHistLoading">Yükleniyor...</div>
+<canvas id="pfHistCanvas"></canvas>
+</div>
+</div>
+</div>
+</div>

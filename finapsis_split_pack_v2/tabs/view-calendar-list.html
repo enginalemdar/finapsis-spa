@@ -1,0 +1,64 @@
+<div class="view-section" id="view-calendar-list">
+<div class="wrap">
+<div class="cal-filter-bar">
+<div class="cal-filter-group">
+<button class="cal-pill active" onclick="calListSetTime('today', this)">Bugün</button>
+<button class="cal-pill" onclick="calListSetTime('tomorrow', this)">Yarın</button>
+<button class="cal-pill" onclick="calListSetTime('yesterday', this)">Dün</button>
+<button class="cal-pill" onclick="calListSetTime('this-week', this)">Bu Hafta</button>
+<button class="cal-pill" onclick="calListSetTime('next-week', this)">Gelecek Hafta</button>
+<button class="cal-pill" onclick="calListSetTime('prev-week', this)">Geçen Hafta</button>
+<button class="cal-pill" onclick="calListSetTime('this-month', this)">Bu Ay</button>
+<button class="cal-pill" onclick="calListSetTime('next-month', this)">Gelecek Ay</button>
+<button class="cal-pill" onclick="calListSetTime('prev-month', this)">Geçen Ay</button>
+</div>
+<div class="cal-filter-group">
+<button class="cal-icon-btn" onclick="calListToggleFilter('region', 'tr', this)" title="Türkiye">
+<img src="https://flagcdn.com/w40/tr.png"/>
+</button>
+<button class="cal-icon-btn" onclick="calListToggleFilter('region', 'us', this)" title="ABD">
+<img src="https://flagcdn.com/w40/us.png"/>
+</button>
+<button class="cal-icon-btn" onclick="calListToggleFilter('region', 'eu', this)" title="Euro Bölgesi">
+<img src="https://flagcdn.com/w40/eu.png"/>
+</button>
+</div>
+<div class="cal-filter-group" style="padding-left:8px;">
+<div class="cal-impact-rating" data-level="1" id="calImpactFilter" title="Etki Seviyesi Seç">
+<svg class="cal-impact-item" onclick="calListSetImpact(1, event)" viewbox="0 0 24 24">
+<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+</svg>
+<svg class="cal-impact-item" onclick="calListSetImpact(2, event)" viewbox="0 0 24 24">
+<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+</svg>
+<svg class="cal-impact-item" onclick="calListSetImpact(3, event)" viewbox="0 0 24 24">
+<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+</svg>
+</div>
+</div>
+<div class="cal-search-wrap">
+<i class="fa-solid fa-search cal-search-icon"></i>
+<input class="cal-search-input" oninput="calListSearch(this.value)" placeholder="Etkinlik ara..." type="text"/>
+</div>
+</div>
+<div id="calAsOf" style="margin: -10px 0 12px 0; color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 700;">
+  Son güncelleme: -
+</div>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr>
+<th>Ekonomik Gösterge</th>
+<th>Etki</th>
+<th>Beklenen</th>
+<th>Gerçekleşen</th>
+<th>Önceki</th>
+<th>Hatırlat</th>
+</tr>
+</thead>
+<tbody id="calendar-list-tbody">
+</tbody>
+</table>
+</div>
+</div>
+</div>
