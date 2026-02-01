@@ -224,125 +224,121 @@ async function finMapWithConcurrency(items, limit, worker) {
   await Promise.all(runners);
 }
 
+// js/global.js içindeki finBuildMapForActiveGroup
+
+window.isFinDataReady = false; // Global bayrak
+
 async function finBuildMapForActiveGroup(done) {
-  if (typeof done === "function") window.__FIN_METRICS_WAITERS.push(done);
-  if (__loadingMetrics) return;
-  __loadingMetrics = true;
+    if (typeof done === "function") window.__FIN_METRICS_WAITERS.push(done);
+    if (__loadingMetrics) return;
+    
+    __loadingMetrics = true;
+    window.isFinDataReady = false; // Veri hazırlanıyor, henüz hazır değil!
 
-  const g = String(window.activeGroup || "bist");
-  window.__FIN_MAP = window.__FIN_MAP || {};
+    // UI: Screener tablosunu kilitle (Eğer açıksa)
+    updateScreenerLoadingState(true);
 
-  const activeTickers = new Set(
-    (window.companies || [])
-    .filter(c => {
-      if (c.group === g) return true;
-      if ((g === 'nyse' || g === 'nasdaq') && c.group === 'sp') return true;
-      return false;
-    })
-    .map(c => String(c.ticker).trim().toUpperCase())
-  );
+    const g = String(window.activeGroup || "bist");
+    window.__FIN_MAP = window.__FIN_MAP || {};
 
-  try {
-    console.time("VeriIndirme");
+    const activeTickers = new Set(
+        (window.companies || [])
+        .filter(c => {
+            if (c.group === g) return true;
+            if ((g === 'nyse' || g === 'nasdaq') && c.group === 'sp') return true;
+            return false;
+        })
+        .map(c => String(c.ticker).trim().toUpperCase())
+    );
 
-    if (!window.__ADR_CACHE) {
-      try {
-        const adrRes = await fetch(`${window.FIN_DATA_BASE}/static/drs.json`);
-        if (adrRes.ok) {
-          const rawAdr = await adrRes.json();
-          window.__ADR_CACHE = {};
-          for (const [tick, ratioStr] of Object.entries(rawAdr)) {
-            const parts = ratioStr.split(':');
-            if (parts.length === 2) window.__ADR_CACHE[tick] = parseFloat(parts[1]) / parseFloat(parts[0]);
-          }
-        }
-      } catch (e) {
-        window.__ADR_CACHE = {};
-      }
-    }
-
-    let totalPages = 1;
     try {
-      const stateRes = await fetch(`${window.FIN_DATA_BASE}/__state/metrics_v1.json?t=${Date.now()}`);
-      if (stateRes.ok) {
-        const stateData = await stateRes.json();
-        if (stateData.page) {
-          totalPages = stateData.page;
+        console.time("VeriIndirme");
+
+        // ... (ADR ve Page Count kısımları AYNI kalsın) ...
+        // (Burayı kısaltıyorum, mevcut kodunuzdaki A ve B bölümleri aynen kalsın)
+        if (!window.__ADR_CACHE) { /* ... fetch drs ... */ }
+        let totalPages = 32; // Varsayılan, state'den okuma kodu buradaydı
+        
+        // ...
+
+        const pageIds = [];
+        for (let i = 0; i < totalPages; i++) pageIds.push(String(i).padStart(3, '0'));
+
+        const processItem = (item) => {
+             // ... (Mevcut processItem mantığı AYNI kalsın) ...
+             if (!item || !item.t) return;
+             const ticker = String(item.t).trim().toUpperCase();
+             if (!activeTickers.has(ticker)) return;
+
+             if (!window.__FIN_MAP[ticker]) window.__FIN_MAP[ticker] = {};
+             const target = window.__FIN_MAP[ticker];
+             const vals = item.v || {};
+
+             for (const [shortKey, val] of Object.entries(vals)) {
+                 if (val === null) continue;
+                 const longKey = METRIC_KEY_MAP[shortKey];
+                 if (longKey) target[longKey] = val;
+             }
+             // ... (Fiyat ve MCAP hesaplama kısımları aynen kalsın) ...
+        };
+
+        const BATCH_SIZE = 4;
+        for (let i = 0; i < pageIds.length; i += BATCH_SIZE) {
+            const batch = pageIds.slice(i, i + BATCH_SIZE);
+            const promises = batch.map(pid => fetch(`${window.FIN_DATA_BASE}/metrics/page/${pid}.v1.json`).then(r => r.ok ? r.json() : []));
+            const results = await Promise.all(promises);
+
+            for (const data of results) {
+                if (!Array.isArray(data)) continue;
+                const CHUNK_SIZE = 500;
+                for (let j = 0; j < data.length; j += CHUNK_SIZE) {
+                    const chunk = data.slice(j, j + CHUNK_SIZE);
+                    chunk.forEach(processItem);
+                    await new Promise(r => setTimeout(r, 0)); // UI Nefes Alsın
+                }
+            }
+            
+            // Opsiyonel: İlerleme durumunu bir yere yazabilirsiniz
+            // console.log(`İşlenen: ${i + BATCH_SIZE} / ${totalPages}`);
         }
-      }
+        
+        console.timeEnd("VeriIndirme");
+
     } catch (e) {
-      console.warn("State okunamadı, varsayılan 1.");
+        console.error("[METRICS] Hata:", e);
+    } finally {
+        __loadingMetrics = false;
+        window.isFinDataReady = true; // ✅ Veri artık TAMAMEN hazır
+
+        // UI: Kilidi kaldır
+        updateScreenerLoadingState(false);
+
+        const q = (window.__FIN_METRICS_WAITERS || []).splice(0);
+        q.forEach(fn => { try { fn(); } catch (e) {} });
     }
+}
 
-    console.log(`[METRICS] Toplam ${totalPages} sayfa paralel indirilecek.`);
+// ✅ YENİ YARDIMCI: Screener tablosunu grileştirip "Yükleniyor" yazar
+function updateScreenerLoadingState(isLoading) {
+    const tbody = document.getElementById('screener-results-body');
+    if (!tbody) return;
 
-    const pageIds = [];
-    for (let i = 0; i < totalPages; i++) pageIds.push(String(i).padStart(3, '0'));
-
-    const CONCURRENCY = 6;
-
-    await finMapWithConcurrency(pageIds, CONCURRENCY, async (pageId) => {
-      const pageUrl = `${window.FIN_DATA_BASE}/metrics/page/${pageId}.v1.json`;
-      const res = await fetch(pageUrl);
-      if (!res.ok) return;
-
-      const arr = await res.json();
-      if (!Array.isArray(arr)) return;
-
-      arr.forEach(item => {
-        if (!item || !item.t) return;
-
-        const ticker = String(item.t).trim().toUpperCase();
-        if (!activeTickers.has(ticker)) return;
-
-        if (!window.__FIN_MAP[ticker]) window.__FIN_MAP[ticker] = {};
-        const target = window.__FIN_MAP[ticker];
-        const vals = item.v || {};
-
-        for (const [shortKey, val] of Object.entries(vals)) {
-          if (val === null) continue;
-          const longKey = METRIC_KEY_MAP[shortKey];
-          if (longKey) target[longKey] = val;
+    if (isLoading) {
+        tbody.style.opacity = "0.3";
+        tbody.style.pointerEvents = "none"; // Tıklamayı engelle
+        // İstersen tablo üzerine bir overlay div de ekleyebilirsin ama opacity en basitidir.
+        
+        // Eğer tablo boşsa spinner göster
+        if (tbody.children.length < 2) {
+             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:50px; color:#c2f50e;"><div class="spinner" style="margin:0 auto 10px auto;"></div>Veriler Analiz Ediliyor...<br><span style="font-size:10px; color:#666;">(Binlerce şirket taranıyor)</span></td></tr>';
+             tbody.style.opacity = "1";
         }
-
-        const price = (window.currentPriceData && window.currentPriceData[ticker]) ?
-          Number(window.currentPriceData[ticker]) : 0;
-
-        let shares = vals.sh;
-        if (shares && window.__ADR_CACHE && window.__ADR_CACHE[ticker]) {
-          shares = shares / window.__ADR_CACHE[ticker];
-        }
-
-        if (price > 0 && shares) {
-          const mc = price * shares;
-          target["Piyasa Değeri"] = mc;
-
-          if (vals.ni) target["F/K"] = mc / vals.ni;
-          if (vals.rev) target["Fiyat/Satışlar"] = mc / vals.rev;
-
-          if (vals.eq && vals.eq > 0) {
-            target["PD/DD"] = mc / vals.eq;
-          } else if (vals.ta && vals.de !== undefined) {
-            const equity = vals.ta / (1 + vals.de);
-            if (equity > 0) target["PD/DD"] = mc / equity;
-          }
-        }
-      });
-    });
-
-    console.timeEnd("VeriIndirme");
-
-  } catch (e) {
-    console.error("[METRICS] Kritik Hata:", e);
-  } finally {
-    __loadingMetrics = false;
-    const q = (window.__FIN_METRICS_WAITERS || []).splice(0);
-    q.forEach(fn => {
-      try {
-        fn();
-      } catch (e) {}
-    });
-  }
+    } else {
+        tbody.style.opacity = "1";
+        tbody.style.pointerEvents = "auto";
+        // İşlem bitince renderScreenerResults'ı tetikle (screener.js'de var)
+        if(typeof renderScreenerResults === 'function') renderScreenerResults();
+    }
 }
 
 // --- PARA FORMATLAYICILAR ---

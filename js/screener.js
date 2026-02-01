@@ -109,8 +109,19 @@ function getStatValue(sector, metricKey, method) {
 // ------------------------------------------------
 let __renderTimeout;
 
+// js/screener.js
+
+// ... (önceki kodlar) ...
+
 function renderScreenerResults() {
-    // Debounce
+    // 1. Veri Hazır mı Kontrolü
+    // global.js'de tanımladığımız bayrağı kontrol ediyoruz.
+    // Eğer false ise, global.js zaten "Yükleniyor" ekranını gösteriyor, biz çıkalım.
+    if (window.isFinDataReady === false) {
+        console.log("Veri henüz hazır değil, bekleniyor...");
+        return; 
+    }
+
     if (__renderTimeout) clearTimeout(__renderTimeout);
 
     const tbody = document.getElementById('screener-results-body');
@@ -118,11 +129,12 @@ function renderScreenerResults() {
 
     if (!isScreenerComputing) tbody.style.opacity = "0.5";
 
-    // 100ms gecikme ile UI bloklanmasını önle
     __renderTimeout = setTimeout(() => {
         _renderScreenerResultsAsync(tbody);
     }, 100); 
 }
+
+// ... (kalan kodlar aynı) ...
 
 async function _renderScreenerResultsAsync(tbody) {
     isScreenerComputing = true;
