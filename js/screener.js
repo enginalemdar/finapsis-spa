@@ -322,42 +322,51 @@ async function _renderScreenerResultsAsync(tbody) {
         await new Promise(resolve => setTimeout(resolve, 0));
     }
 
-    // 2. ADIM: SIRALAMA
-    rankedData.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-
-        // Eşitlik durumunda ilk metriğe göre sırala
-        for (const metric of activeMetrics) {
-            const detA = a.matchDetails.find(x => x.id === metric.id);
-            const detB = b.matchDetails.find(x => x.id === metric.id);
-
-            const valA = detA ? detA.val : null;
-            const valB = detB ? detB.val : null;
-
-            const aValid = (valA !== null);
-            const bValid = (valB !== null);
-            
-            if (!aValid && bValid) return 1;
-            if (aValid && !bValid) return -1;
-            if (!aValid && !bValid) continue;
-
-            if (valA !== valB) {
-                if (metric.direction === 'low') {
-                    if (valA > 0 && valB <= 0) return -1;
-                    if (valA <= 0 && valB > 0) return 1;
-                    return valA - valB; 
-                } else {
-                    return valB - valA;
+    // 2. ADIM: SIRALAMA - Sadece ilk 50 gerekli, tümünü sırala yok
+    // Score'a göre bucket'la, sonra sadece en yüksek bucket'ı sırala
+    const displayLimit = 50;
+    
+    // Score gruplarına ayır
+    const scoreBuckets = {};
+    for (const item of rankedData) {
+        if (!scoreBuckets[item.score]) scoreBuckets[item.score] = [];
+        scoreBuckets[item.score].push(item);
+    }
+    
+    // Score'u descending sırala
+    const sortedScores = Object.keys(scoreBuckets).map(Number).sort((a, b) => b - a);
+    
+    // En yüksek score'lardan başlayarak 50 tane topla
+    let topItems = [];
+    for (const score of sortedScores) {
+        if (topItems.length >= displayLimit) break;
+        
+        const bucket = scoreBuckets[score];
+        
+        // Bu bucket içinde detay bazlı sıralama yap (sadece küçük bucket)
+        if (bucket.length > 1) {
+            bucket.sort((a, b) => {
+                for (const metric of activeMetrics) {
+                    const detA = a.matchDetails.find(x => x.id === metric.id);
+                    const detB = b.matchDetails.find(x => x.id === metric.id);
+                    const valA = detA ? detA.val : null;
+                    const valB = detB ? detB.val : null;
+                    if (valA === null && valB !== null) return 1;
+                    if (valA !== null && valB === null) return -1;
+                    if (valA === null && valB === null) continue;
+                    if (valA !== valB) {
+                        return metric.direction === 'low' ? valA - valB : valB - valA;
+                    }
                 }
-            }
+                return 0;
+            });
         }
         
-        return a.ticker.localeCompare(b.ticker);
-    });
-
-    // 3. ADIM: HTML OLUŞTURMA (Sadece ilk 50)
-    const displayLimit = 50; 
-    const dataToRender = rankedData.slice(0, displayLimit);
+        const needed = displayLimit - topItems.length;
+        topItems = topItems.concat(bucket.slice(0, needed));
+    }
+    
+    const dataToRender = topItems;
 
     const htmlRows = dataToRender.map((comp, index) => {
         const sortedDetails = [];
