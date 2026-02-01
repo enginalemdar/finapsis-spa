@@ -92,9 +92,85 @@ function _renderScreenerUI() {
 // PERFORMANS OPTİMİZASYONU: Veri Hazırlığı
 // ------------------------------------------------
 function processScreenerData() {
-    // Sadece aktif grubu filtrele
-    // Map'ten verileri KOPYALAMAK yok. Sadece pointer tutacağız.
     processedData = (window.companies || []).filter(c => c.group === window.activeGroup);
+    
+    // Cache'te olmayan hesaplanan metrikleri ekle (F/K, PD/DD, Piyasa Değeri)
+    _patchStatsCache();
+}
+
+function _patchStatsCache() {
+    const group = window.activeGroup;
+    const cache = window.__SCREENER_STATS_CACHE;
+    if (!cache || !cache[group]) return;
+    
+    // Zaten patch'lanmış mı kontrol et
+    if (cache[group]._patched) return;
+    
+    const map = window.__FIN_MAP || {};
+    const metricsToCalc = ["F/K", "PD/DD", "Piyasa Değeri", "Fiyat/Satışlar"];
+    
+    // Sektör bazlı verileri topla
+    const sectorBuckets = {};  // { sektörAdı: { "F/K": [val1, val2, ...], ... } }
+    const globalBuckets = {};  // { "F/K": [val1, val2, ...], ... }
+    
+    metricsToCalc.forEach(m => { globalBuckets[m] = []; });
+    
+    processedData.forEach(comp => {
+        const d = map[comp.ticker];
+        if (!d) return;
+        
+        const sec = comp.sector || "Diğer";
+        if (!sectorBuckets[sec]) {
+            sectorBuckets[sec] = {};
+            metricsToCalc.forEach(m => { sectorBuckets[sec][m] = []; });
+        }
+        
+        metricsToCalc.forEach(m => {
+            const val = d[m];
+            if (val !== null && val !== undefined && isFinite(val) && val > 0) {
+                globalBuckets[m].push(val);
+                sectorBuckets[sec][m].push(val);
+            }
+        });
+    });
+    
+    // Median hesaplama yardımcısı
+    function calcMedian(arr) {
+        if (!arr.length) return null;
+        const sorted = arr.slice().sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+    function calcMean(arr) {
+        if (!arr.length) return null;
+        return arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
+    
+    // Global istatistikleri ekle
+    metricsToCalc.forEach(m => {
+        if (globalBuckets[m].length > 0) {
+            cache[group].global[m] = {
+                mean: calcMean(globalBuckets[m]),
+                median: calcMedian(globalBuckets[m])
+            };
+        }
+    });
+    
+    // Sektör istatistiklerini ekle
+    for (const sec of Object.keys(sectorBuckets)) {
+        if (!cache[group].sectors[sec]) cache[group].sectors[sec] = {};
+        metricsToCalc.forEach(m => {
+            if (sectorBuckets[sec][m].length > 0) {
+                cache[group].sectors[sec][m] = {
+                    mean: calcMean(sectorBuckets[sec][m]),
+                    median: calcMedian(sectorBuckets[sec][m])
+                };
+            }
+        });
+    }
+    
+    cache[group]._patched = true;
+    console.log("✅ [Screener] Stats cache patched - F/K, PD/DD, Piyasa Değeri eklendi");
 }
 
 // ------------------------------------------------
