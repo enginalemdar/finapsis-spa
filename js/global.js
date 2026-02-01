@@ -538,7 +538,9 @@ async function finBuildMapForActiveGroup(done) {
         console.log(`   ✅ PD/DD: ${pbCount} (${(pbCount/activeTickers.size*100).toFixed(1)}%)`);
 
     } catch (e) {
-        console.error("[METRICS] Hata:", e);
+        console.error("[METRICS] HATA OLUŞTU:", e);
+        console.error("[METRICS] Hata detayı:", e.message);
+        console.error("[METRICS] Stack:", e.stack);
     } finally {
         __loadingMetrics = false;
         window.isFinDataReady = true; 
@@ -859,10 +861,29 @@ async function bootFinapsis() {
     console.log("🚀 [System] Veri motoru başlatılıyor...");
     finBuildMapForActiveGroup(() => {
       console.log("✅ [System] Tüm veriler hazır.");
-      const activeTab = localStorage.getItem('finapsis_active_main_tab');
-      if (activeTab === 'karsilastirma.html' && window.cmpRender) window.cmpRender();
-      if (activeTab === 'screener.html' && typeof renderScreenerResults === "function") renderScreenerResults();
-      if (activeTab === 'companieslist.html' && typeof renderCompanyList === "function") renderCompanyList();
+      
+      // Render fonksiyonlarını hemen çağırmak yerine biraz bekle (scriptler yüklensin)
+      setTimeout(() => {
+        const activeTab = localStorage.getItem('finapsis_active_main_tab');
+        console.log("📍 [Boot] Aktif tab:", activeTab);
+        
+        if (activeTab === 'karsilastirma.html' && window.cmpRender) {
+          console.log("🎯 [Boot] Compare render ediliyor...");
+          window.cmpRender();
+        }
+        if (activeTab === 'screener.html' || !activeTab) {
+          if (typeof renderScreenerResults === "function") {
+            console.log("🎯 [Boot] Screener render ediliyor...");
+            renderScreenerResults();
+          } else {
+            console.warn("⚠️ [Boot] renderScreenerResults henüz tanımlı değil");
+          }
+        }
+        if (activeTab === 'companieslist.html' && typeof renderCompanyList === "function") {
+          console.log("🎯 [Boot] Companies render ediliyor...");
+          renderCompanyList();
+        }
+      }, 200);
     });
   }
 
@@ -899,9 +920,7 @@ async function bootFinapsis() {
   }
 }
 
-// DOM Hazırsa hemen çalış, değilse bekle
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootFinapsis);
-} else {
-    bootFinapsis();
-}
+// ❌ OTOMATIK BOOT KALDIRILDI
+// index.html tüm scriptleri yüklediğinde bootFinapsis() çağıracak
+// Bu sayede screener.js ve diğer dosyalar hazır olacak
+window.bootFinapsis = bootFinapsis;
