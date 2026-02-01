@@ -45,34 +45,28 @@ const METRIC_KEY_MAP = {
 
 // ... (Üstteki sabitler ve METRIC_KEY_MAP aynı kalsın) ...
 
+// js/global.js içindeki loadFinapsisData fonksiyonunun DOĞRU hali:
+
 async function loadFinapsisData() {
   console.log("📥 [Data] Veri indirme başladı...");
   
-  // 1. Mevcut fetch işlemleri
   const pCompanies = fetch(window.COMPANIES_DATA_URL);
-  const pPrices = fetch(`${window.FIN_DATA_BASE}/price/detail.v1.json`);
+  const pPrices = fetch(`${window.FIN_DATA_BASE}/price/detail.v1.json`); // Fiyatlar burada!
   const pIndMap = fetch(`${window.FIN_DATA_BASE}/indicators/indicatorsmap.json`);
   const pIndSum = fetch(`${window.FIN_DATA_BASE}/indicators/summary.v1.json`);
   
-  // ✅ 2. YENİ: İstatistik Dosyasını Çek
-  // (Dosya henüz yoksa {} döner, hata vermez)
+  // İstatistik Dosyasını Çek
   const pStats = fetch(`${window.FIN_DATA_BASE}/static/screener_stats.v1.json`)
                   .then(res => res.ok ? res.json() : {})
                   .catch(() => ({})); 
 
   try {
-    // 3. Hepsini Paralel Bekle
     const [resComp, resPrice, resIndMap, resIndSum, statsData] = await Promise.all([
       pCompanies, pPrices, pIndMap, pIndSum, pStats
     ]);
 
-    // ✅ 4. İstatistikleri Global Değişkene Ata
+    // İstatistikleri Ata
     window.__SCREENER_STATS_CACHE = statsData || {};
-    console.log("[Data] İstatistik dosyası yüklendi.");
-
-    // ... (Mevcut kodların geri kalanı AYNI kalsın: indicators, companies, prices işleme) ...
-    // ...
-    // (Aşağıdaki kısımları bozmadan koruyun)
 
     if (resIndMap.ok) window.__INDICATORS_MAP = await resIndMap.json();
     if (resIndSum.ok) {
@@ -88,8 +82,11 @@ async function loadFinapsisData() {
       window.companies = [];
     }
 
+    // 🛑 DÜZELTME BURADA BAŞLIYOR: FİYAT DOSYASINI İŞLEME 🛑
     if (resPrice.ok) {
       const rawDetail = await resPrice.json();
+      
+      // JSON formatını normalize et (Array içinde data vs.)
       const detailList =
         (rawDetail && Array.isArray(rawDetail.data)) ? rawDetail.data :
         (Array.isArray(rawDetail) && rawDetail[0]?.data && Array.isArray(rawDetail[0].data)) ? rawDetail[0].data :
@@ -97,6 +94,8 @@ async function loadFinapsisData() {
 
       window.currentPriceData = {};
       window.prevPriceData = {};
+      
+      // __FIN_MAP'i başlat veya koru
       window.__FIN_MAP = window.__FIN_MAP || {};
 
       detailList.forEach(item => {
@@ -105,33 +104,44 @@ async function loadFinapsisData() {
           const p = Number(item.price);
           const prev = Number(item.prev);
 
+          // 1. Global Fiyat Değişkenlerini Güncelle
           window.currentPriceData[t] = p;
           window.prevPriceData[t] = prev;
 
+          // 2. Map Verisini Güncelle (Screener ve Listeler için)
           if (!window.__FIN_MAP[t]) window.__FIN_MAP[t] = {};
           const target = window.__FIN_MAP[t];
 
           target["price"] = p;
           target["prev"] = prev;
 
+          // 3. PİYASA DEĞERİ (MCAP) HESAPLAMA
+          // Eğer metrik verileri (Hisse Adedi) fiyattan önce indiyse, fiyat gelince MC'yi hemen hesapla.
+          // Metriklerde hisse adedi 'sh', 'Hisse Adedi' veya 'Total Common Shares Outstanding' olarak gelebilir.
           const shares = target["Hisse Adedi"] || target["sh"] || target["Total Common Shares Outstanding"];
 
           if (p > 0 && shares > 0) {
             let finalShares = shares;
+            // ADR kontrolü (varsa)
             if (window.__ADR_CACHE && window.__ADR_CACHE[t]) {
               finalShares = shares / window.__ADR_CACHE[t];
             }
             target["Piyasa Değeri"] = p * finalShares;
+            
+            // F/K gibi fiyat bazlı metrikleri de güncellemek gerekebilir
+            if(target["ni"]) target["F/K"] = target["Piyasa Değeri"] / target["ni"];
           }
         }
       });
 
-      console.log(`[Data] ${detailList.length} fiyat yüklendi.`);
+      console.log(`[Data] ${detailList.length} detaylı fiyat işlendi ve map'e yazıldı.`);
 
+      // Tabloyu hemen güncelle!
       if (typeof window.renderCompanyList === "function") {
         window.renderCompanyList();
       }
     }
+    // 🛑 DÜZELTME BİTTİ 🛑
 
   } catch (e) {
     console.error("[Data] Yükleme hatası:", e);
