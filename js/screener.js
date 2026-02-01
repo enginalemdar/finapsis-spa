@@ -272,13 +272,16 @@ async function _renderScreenerResultsAsync(tbody) {
             for (const metric of activeMetrics) {
                 let val = d[metric.dataKey];
                 
-                // Yüzde düzeltmesi
+                // 🚀 BROWSERDA HESAP YOK, JSON'DAN OKU
+                let avg = getStatValue(comp.sector, metric.dataKey, calculationMethod);
+
+                // Yüzde düzeltmesi - val VE avg birlikte
                 if (metric.isPercent && val !== undefined && val !== null && Math.abs(val) < 5) {
                     val = val * 100;
                 }
-
-                // 🚀 BROWSERDA HESAP YOK, JSON'DAN OKU
-                const avg = getStatValue(comp.sector, metric.dataKey, calculationMethod);
+                if (metric.isPercent && avg !== undefined && avg !== null && Math.abs(avg) < 5) {
+                    avg = avg * 100;
+                }
 
                 if (val !== undefined && val !== null && avg !== undefined && avg !== null) {
                     let isGood = false;
