@@ -990,6 +990,37 @@ tr.sec-row-level-3:hover td { background: #252525 !important; }
     #view-compare .val-highlight { color: #fff; font-weight: 700; }
     #view-compare .muted { opacity: 0.3; }
 
+    /* ✅ Compare: sticky header alttan satır göstermesin */
+#view-compare .cmp-table-wrapper table {
+  border-collapse: separate;   /* sticky için daha stabil */
+  border-spacing: 0;
+}
+
+#view-compare .cmp-table-wrapper thead th {
+  position: sticky;
+  top: 0;
+  z-index: 50;                 /* satırların üstünde */
+  background: #0b0b0b;         /* OPak arkaplan */
+  background-clip: padding-box;
+}
+
+/* Eğer ilk kolon da sticky ise (gösterge isimleri gibi) */
+#view-compare .cmp-table-wrapper tbody th,
+#view-compare .cmp-table-wrapper tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 40;
+  background: #0b0b0b;
+}
+
+/* Sol üst köşe (hem top hem left sticky kesişimi) */
+#view-compare .cmp-table-wrapper thead th:first-child {
+  left: 0;
+  z-index: 60;
+  background: #0b0b0b;
+}
+
+
     @media (max-width: 768px) {
       #view-compare table { display: flex; flex-direction: column; width: 100%; min-width: auto; padding: 15px; }
       #view-compare thead { display: none; }
