@@ -793,12 +793,14 @@ function render52w(){
 
   document.getElementById("rangeFill").style.width = pct + "%";
   document.getElementById("rangeThumb").style.left = pct + "%";
-  document.getElementById("currentPriceLabel").innerText = formatPrice(current);
-  document.getElementById("lowPrice").innerText = formatPrice(low);
-  document.getElementById("highPrice").innerText = formatPrice(high);
-
+  
   let sym = currencySymbolForTicker(currentTicker);
   const indInfo = getIndicatorInfo(currentTicker);
+  const isPercentage = indInfo && indInfo.valueType === "percentage";
+  
+  document.getElementById("currentPriceLabel").innerText = isPercentage ? formatPrice(current * 100) : formatPrice(current);
+  document.getElementById("lowPrice").innerText = isPercentage ? formatPrice(low * 100) : formatPrice(low);
+  document.getElementById("highPrice").innerText = isPercentage ? formatPrice(high * 100) : formatPrice(high);
 
   if (indInfo) {
     if (indInfo.valueType === "percentage") {
@@ -1352,6 +1354,8 @@ window.finDetailBootOnce = function(){
 };
 
 window.finDetailLoad = function(ticker){
+  const searchInput = document.getElementById('tickerSearch');
+  if (searchInput) searchInput.value = '';
   try { loadAll(ticker); } catch(e){ console.error('finDetailLoad error', e); }
 };
 window.finDetailRefreshHeaderPrice = function(){
