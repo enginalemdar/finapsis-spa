@@ -8,7 +8,25 @@
   let BUBBLE_API_TOKEN = String((CFG.BUBBLE_API_TOKEN || window.BUBBLE_API_TOKEN || '')).trim();
 
   // bubble.html → postMessage({ type: "FIN_SESSION", payload: { user_id, email, plan } })
-  // (listener aşağıda state tanımlandıktan sonra kurulur)
+  window.addEventListener("message", function(ev) {
+    if (!ev.data || ev.data.type !== "FIN_SESSION") return;
+    const p = ev.data.payload || {};
+    const uid = String(p.user_id || "").trim();
+    if (!uid) return;
+    if (uid === BUBBLE_USER_ID) return; // zaten set edilmiş
+
+    BUBBLE_USER_ID = uid;
+    BUBBLE_USER_NAME = String(p.email || p.name || "User").trim();
+    BUBBLE_API_TOKEN = String(p.token || "").trim();
+    console.log("[PF] FIN_SESSION alındı, user_id:", uid);
+
+    // user henüz set edilmemişse (auth ekranında bekleniyorsa) otomatik başlat
+    if (!state.user) {
+      state.user = { id: BUBBLE_USER_ID, name: BUBBLE_USER_NAME };
+      if (BUBBLE_API_TOKEN) state.token = BUBBLE_API_TOKEN;
+      refreshData();
+    }
+  });
 
   const API_BASE = String((CFG.API_BASE || 'https://eap-35848.bubbleapps.io/api/1.1/wf')).replace(/\/\s*$/, '');
   const GOOGLE_CLIENT_ID = String((CFG.GOOGLE_CLIENT_ID || '')).trim();
@@ -32,7 +50,7 @@ window.pfRefreshPricesFromProxy = async function(){
     
     if (res.ok) {
         const rawDetail = await res.json();
-        const detailList = (Array.isArray(rawDetail) && rawDetail[0]?.data) ? rawDetail[0].data : [];
+        const detailList = Array.isArray(rawDetail?.data) ? rawDetail.data : (Array.isArray(rawDetail) ? (rawDetail[0]?.data || rawDetail) : []);
 
         detailList.forEach(item => {
             if (item.ticker) {
@@ -99,26 +117,6 @@ window.pfRefreshPricesFromProxy = pfRefreshPricesFromProxy;
 
   let charts = {};
 
-  // FIN_SESSION listener — state artık hazır
-  window.addEventListener("message", function(ev) {
-    if (!ev.data || ev.data.type !== "FIN_SESSION") return;
-    const p = ev.data.payload || {};
-    const uid = String(p.user_id || "").trim();
-    if (!uid) return;
-    if (uid === BUBBLE_USER_ID) return;
-
-    BUBBLE_USER_ID = uid;
-    BUBBLE_USER_NAME = String(p.email || p.name || "User").trim();
-    BUBBLE_API_TOKEN = String(p.token || "").trim();
-    console.log("[PF] FIN_SESSION alındı, user_id:", uid);
-
-    if (!state.user) {
-      state.user = { id: BUBBLE_USER_ID, name: BUBBLE_USER_NAME };
-      if (BUBBLE_API_TOKEN) state.token = BUBBLE_API_TOKEN;
-      refreshData();
-    }
-  });
-
   // O(1) ticker lookup — companies yüklenince map'ı build
   let __pfCompMap = null;
   function pfGetCompMap() {
@@ -140,7 +138,7 @@ window.pfRefreshPricesFromProxy = pfRefreshPricesFromProxy;
 
   const isUSD = (ticker) => {
     const item = getItem(ticker);
-    return item && (item.group === 'nyse' || item.group === 'nasdaq' || item.group === 'emtia' || item.group === 'kripto');
+    return item && (item.group === 'sp' || item.group === 'nasdaq' || item.group === 'nyse' || item.group === 'emtia' || item.group === 'kripto');
   };
 
   const getSym = (ticker) => isUSD(ticker) ? '$' : '₺';
@@ -348,7 +346,7 @@ document.addEventListener("visibilitychange", () => {
   return v ? v : "Diğer";
 }
 function pfCanSectorFilter(){
-  return state.activeGroup === "bist";
+  return state.activeGroup === "bist" || state.activeGroup === "sp";
 }
 
 window.pfBuildSectorList = function(){
@@ -458,50 +456,83 @@ document.addEventListener("click", (e) => {
 };
 
 
+  const PF_PAGE_SIZE = 80;
+
+  function pfBuildItemHTML(c) {
+    const cur = getPrice(c.ticker) || 0; const prev = getPrevPrice(c.ticker) || cur;
+    let change = 0; if (prev > 0) change = ((cur - prev) / prev) * 100;
+    const color = change >= 0 ? 'text-green' : 'text-red';
+    const sign = change > 0 ? '+' : '';
+    const sym = getSym(c.ticker);
+    return `<div class="market-item" onclick="pfOpenTradeModal('${c.ticker}')">
+      <img src="${c.logourl}" class="ticker-logo" onerror="this.style.display='none'">
+      <div style="flex:1;">
+        <span class="ticker-symbol">${c.ticker}</span>
+        <span class="ticker-name">${c.name}</span>
+      </div>
+      <div style="text-align:right;">
+        <span class="price-val">${sym}${cur.toFixed(2)}</span>
+        <span class="price-change ${color}">${sign}${change.toFixed(2)}%</span>
+      </div>
+      <button class="fp-menu-btn"
+        title="İşlemler"
+        onclick="event.stopPropagation(); fpOpenRowMenu('${c.ticker}', event)">
+        <i class="fa-solid fa-ellipsis-vertical"></i>
+      </button>
+    </div>`;
+  }
+
   window.pfRenderMarketList = function() {
     try { window.finEnsureCompanies && window.finEnsureCompanies(); } catch(e){}
     const term = document.getElementById('searchInput')?.value.toLowerCase() || "";
     const list = document.getElementById('marketList');
+    if (!list) return;
     const sector = state.sectorFilter || "";
 
-const filtered = (window.companies || []).filter(c => {
-  if (c.group !== state.activeGroup) return false;
+    const filtered = (window.companies || []).filter(c => {
+      if (c.group !== state.activeGroup) return false;
+      if (pfCanSectorFilter() && sector) {
+        if (pfNormSector(c.sector) !== sector) return false;
+      }
+      const tkr = (c.ticker == null) ? "" : String(c.ticker).toLowerCase();
+      const nm  = (c.name == null) ? "" : String(c.name).toLowerCase();
+      return (tkr.includes(term) || nm.includes(term));
+    });
 
-  if (pfCanSectorFilter() && sector) {
-    if (pfNormSector(c.sector) !== sector) return false;
-  }
+    window.__pfFiltered = filtered;
+    window.__pfPage = 0;
 
-  const tkr = (c.ticker == null) ? "" : String(c.ticker).toLowerCase();
-const nm  = (c.name == null) ? "" : String(c.name).toLowerCase();
-return (tkr.includes(term) || nm.includes(term));
+    const chunk = filtered.slice(0, PF_PAGE_SIZE);
+    list.innerHTML = chunk.map(pfBuildItemHTML).join('');
 
-});
-
-    list.innerHTML = filtered.map(c => {
-      const cur = getPrice(c.ticker) || 0; const prev = getPrevPrice(c.ticker) || cur;
-      let change = 0; if (prev > 0) change = ((cur - prev) / prev) * 100;
-      const color = change >= 0 ? 'text-green' : 'text-red';
-      const sign = change > 0 ? '+' : '';
-      const sym = getSym(c.ticker);
-      return `<div class="market-item" onclick="pfOpenTradeModal('${c.ticker}')">
-        <img src="${c.logourl}" class="ticker-logo" onerror="this.style.display='none'">
-        <div style="flex:1;">
-          <span class="ticker-symbol">${c.ticker}</span>
-          <span class="ticker-name">${c.name}</span>
-        </div>
-        <div style="text-align:right;">
-          <span class="price-val">${sym}${cur.toFixed(2)}</span>
-          <span class="price-change ${color}">${sign}${change.toFixed(2)}%</span>
-        </div>
-        <button class="fp-menu-btn"
-  title="İşlemler"
-  onclick="event.stopPropagation(); fpOpenRowMenu('${c.ticker}', event)">
-  <i class="fa-solid fa-ellipsis-vertical"></i>
-</button>
-
-      </div>`;
-    }).join('');
+    // scroll container sıfırla
+    const sc = list.closest('.market-list') || list.parentElement;
+    if (sc) sc.scrollTop = 0;
   };
+
+  // Infinite scroll loader
+  (function() {
+    document.addEventListener('scroll', function(e) {
+      const target = e.target;
+      if (!target.classList || !target.classList.contains('market-list')) return;
+
+      const list = document.getElementById('marketList');
+      if (!list) return;
+      const filtered = window.__pfFiltered;
+      if (!filtered) return;
+
+      // bottom'a yaklaştı mı?
+      if (target.scrollTop + target.clientHeight >= target.scrollHeight - 150) {
+        const page = (window.__pfPage || 0) + 1;
+        const start = page * PF_PAGE_SIZE;
+        if (start >= filtered.length) return;
+        const end = Math.min(start + PF_PAGE_SIZE, filtered.length);
+        const chunk = filtered.slice(start, end);
+        list.insertAdjacentHTML('beforeend', chunk.map(pfBuildItemHTML).join(''));
+        window.__pfPage = page;
+      }
+    }, true);
+  })();
 
   function getActiveData() {
     if (state.activePortfolioId === ALL_KEY) {
@@ -1282,7 +1313,7 @@ const getDetailUrl = (ticker) => {
   if(!item) return null;
 
   const slug = (item.slug || ticker || "").toString().toLowerCase();
-  const isCompany = (item.group === "bist" || item.group === "nasdaq" || item.group === "nyse");
+  const isCompany = (item.group === "bist" || item.group === "sp" || item.group === "nasdaq" || item.group === "nyse");
   const root = isCompany ? "https://finapsis.co/comdetail/" : "https://finapsis.co/itemdetail/";
   return root + encodeURIComponent(slug);
 };
