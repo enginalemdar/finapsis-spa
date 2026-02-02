@@ -16,6 +16,12 @@
       <div>
         <div class="flex items-center gap-2 mb-1">
           <span id="tickerPill" class="bg-[#1a2205] text-[#c2f50e] border border-[#c2f50e]/30 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wide">-</span>
+          
+          <div class="flex gap-1">
+            <button class="view-badge active" data-view="temel" onclick="switchView('temel')">Temel</button>
+            <button class="view-badge" data-view="teknik" onclick="switchView('teknik')">Teknik</button>
+          </div>
+          
           <span class="text-[10px] font-extrabold text-[#8a8a8a] uppercase tracking-widest">Şirket Detayı</span>
         </div>
         <h1 id="companyTitle" class="text-2xl font-extrabold text-white tracking-tight leading-tight">-</h1>
@@ -210,5 +216,58 @@
 
 #volumeChart:empty {
   display: none;
+}
+
+.view-badge {
+  padding: 4px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  color: #8a8a8a;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+
+.view-badge.active {
+  background: rgba(194,245,14,0.12);
+  border-color: rgba(194,245,14,0.4);
+  color: #c2f50e;
+}
+
+.view-badge:hover:not(.active) {
+  background: rgba(255,255,255,0.08);
+}
+
+.news-sentiment {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.news-sentiment.positive {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.news-sentiment.negative {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.news-sentiment.neutral {
+  background: rgba(156, 163, 175, 0.15);
+  color: #9ca3af;
+}
+
+.metric-badge.neutral {
+  background: rgba(156, 163, 175, 0.15);
+  border: 1px solid rgba(156, 163, 175, 0.3);
+  color: #9ca3af;
 }
 </style>
