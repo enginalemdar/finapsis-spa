@@ -49,17 +49,40 @@
       </div>
 
       <div class="fin-card p-5">
-        <div class="flex justify-between items-center mb-3 gap-3">
+        <div class="flex justify-between items-center mb-3 gap-3 flex-wrap">
           <h3 class="text-white font-extrabold text-sm" id="chartTitle">Hisse Fiyatı</h3>
+          
+          <!-- Chart Type Toggle -->
+          <div class="flex gap-2" id="chartTypeToggle">
+            <button class="chart-type-btn active" data-type="area" onclick="setChartType('area')" type="button">
+              Area
+            </button>
+            <button class="chart-type-btn" data-type="line" onclick="setChartType('line')" type="button">
+              Line
+            </button>
+            <button class="chart-type-btn" data-type="candlestick" onclick="setChartType('candlestick')" type="button">
+              Mum
+            </button>
+          </div>
+
+          <!-- Time Range Buttons -->
           <div class="flex gap-2 flex-wrap justify-end" id="rangeBtns" aria-label="Zaman aralığı">
-            <button class="tab-btn" data-range="MAX" type="button">MAX</button>
-            <button class="tab-btn active" data-range="1Y" type="button">1Y</button>
-            <button class="tab-btn" data-range="6M" type="button">6A</button>
-            <button class="tab-btn" data-range="3M" type="button">3A</button>
-            <button class="tab-btn" data-range="1M" type="button">1A</button>
+            <button class="range-btn" data-range="1H" onclick="ensureChart('1H')" type="button">1H</button>
+            <button class="range-btn" data-range="1D" onclick="ensureChart('1D')" type="button">1G</button>
+            <button class="range-btn" data-range="3D" onclick="ensureChart('3D')" type="button">3G</button>
+            <button class="range-btn" data-range="6D" onclick="ensureChart('6D')" type="button">6G</button>
+            <button class="range-btn active" data-range="1Y" onclick="ensureChart('1Y')" type="button">1Y</button>
+            <button class="range-btn" data-range="YTD" onclick="ensureChart('YTD')" type="button">YTD</button>
+            <button class="range-btn" data-range="5Y" onclick="ensureChart('5Y')" type="button">5Y</button>
+            <button class="range-btn" data-range="MAX" onclick="ensureChart('MAX')" type="button">MAX</button>
           </div>
         </div>
+        
+        <!-- Price Chart -->
         <div id="priceChart" class="-ml-2"></div>
+        
+        <!-- Volume Chart -->
+        <div id="volumeChart" class="-ml-2" style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;"></div>
       </div>
 
       <div class="fin-card flex flex-col" id="cardFinancials"> <div class="card-head tab-scroll" id="financialTabs" role="tablist" aria-label="Finansal tablolar">
@@ -158,3 +181,62 @@
   </div>
   <div class="h-10"></div>
 </div>
+
+<style>
+/* Chart Type Toggle Buttons */
+.chart-type-btn {
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.chart-type-btn.active {
+  background: rgba(194,245,14,0.12) !important;
+  border-color: rgba(194,245,14,0.4) !important;
+  color: #c2f50e !important;
+}
+
+.chart-type-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.2);
+}
+
+/* Time Range Buttons */
+.range-btn {
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 38px;
+  text-align: center;
+}
+
+.range-btn.active {
+  background: rgba(194,245,14,0.15);
+  border-color: #c2f50e;
+  color: #c2f50e;
+}
+
+.range-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.15);
+}
+
+/* Volume Chart Container */
+#volumeChart:empty {
+  display: none;
+}
+</style>
