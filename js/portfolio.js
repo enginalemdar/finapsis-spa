@@ -343,7 +343,8 @@ document.addEventListener("visibilitychange", () => {
 
   function pfNormSector(s){
   const v = String(s || "").trim();
-  return v ? v : "Diğer";
+  if (!v || v === "#N/A" || v === "N/A" || v === "-" || v === "n/a") return "Diğer";
+  return v;
 }
 function pfCanSectorFilter(){
   return state.activeGroup === "bist" || state.activeGroup === "sp";
@@ -363,7 +364,7 @@ window.pfBuildSectorList = function(){
 
   btn.classList.remove("disabled");
   const comps = (window.companies || []).filter(c => c.group === state.activeGroup);
-  const sectors = Array.from(new Set(comps.map(c => pfNormSector(c.sector)))).sort((a,b)=>a.localeCompare(b,"tr"));
+  const sectors = Array.from(new Set(comps.map(c => pfNormSector(c.sector)))).filter(s => s !== "Diğer").sort((a,b)=>a.localeCompare(b,"tr"));
 
   const cur = state.sectorFilter || "";
   let html = `<div class="pf-sector-item ${cur==="" ? "active":""}" data-sec="">Tüm Sektörler</div>`;
