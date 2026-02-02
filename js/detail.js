@@ -786,8 +786,11 @@ function calc52wFromPoints(points){
   for (const p of points){
     if (p.x < cutOff) continue;
 
-    if (p.y < low) low = p.y;
-    if (p.y > high) high = p.y;
+    const pLow = p.l || p.c || p.y || 0;
+    const pHigh = p.h || p.c || p.y || 0;
+    
+    if (pLow < low) low = pLow;
+    if (pHigh > high) high = pHigh;
   }
 
   return { low, high, current };
@@ -1057,7 +1060,14 @@ function ensureChart(rangeKey){
           }
         }
       },
-      tooltip: { theme: "dark", x: { formatter: (val) => fmtISODate(val) }, y: { formatter: (v) => v.toLocaleString('tr-TR', {maximumFractionDigits: 0}) } }
+      tooltip: { 
+        theme: "dark", 
+        x: { formatter: (val) => fmtISODate(val) }, 
+        y: { 
+          title: { formatter: () => "Hacim: " },
+          formatter: (v) => v.toLocaleString('tr-TR', {maximumFractionDigits: 0}) 
+        } 
+      }
     };
 
     try {
@@ -1505,3 +1515,12 @@ async function fetchLatestTickerNews(ticker){
       return [];
   }
 }
+
+// View switcher
+window.switchView = function(view) {
+  if (view === 'teknik') {
+    const currentTicker = window.currentTicker || '';
+    window.location.href = '/teknik.html?ticker=' + currentTicker;
+  }
+  // temel is current page, no action needed
+};
