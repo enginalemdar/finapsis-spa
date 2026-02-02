@@ -57,7 +57,6 @@
             <button class="chart-type-btn active" data-type="area" onclick="setChartType('area')" type="button">
               Area
             </button>
-            <button class="chart-type-btn" data-type="line" onclick="setChartType('line')" type="button">
               Line
             </button>
             <button class="chart-type-btn" data-type="candlestick" onclick="setChartType('candlestick')" type="button">
@@ -67,10 +66,9 @@
 
           <!-- Time Range Buttons -->
           <div class="flex gap-2 flex-wrap justify-end" id="rangeBtns" aria-label="Zaman aralığı">
-            <button class="range-btn" data-range="1H" onclick="ensureChart('1H')" type="button">1H</button>
-            <button class="range-btn" data-range="1D" onclick="ensureChart('1D')" type="button">1G</button>
-            <button class="range-btn" data-range="3D" onclick="ensureChart('3D')" type="button">3G</button>
-            <button class="range-btn" data-range="6D" onclick="ensureChart('6D')" type="button">6G</button>
+            <button class="range-btn" data-range="1A" onclick="ensureChart('1A')" type="button">1A</button>
+            <button class="range-btn" data-range="3A" onclick="ensureChart('3A')" type="button">3A</button>
+            <button class="range-btn" data-range="6A" onclick="ensureChart('6A')" type="button">6A</button>
             <button class="range-btn active" data-range="1Y" onclick="ensureChart('1Y')" type="button">1Y</button>
             <button class="range-btn" data-range="YTD" onclick="ensureChart('YTD')" type="button">YTD</button>
             <button class="range-btn" data-range="5Y" onclick="ensureChart('5Y')" type="button">5Y</button>
