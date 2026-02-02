@@ -117,10 +117,10 @@ function parseMMDDYYYY(s){
 }
 function fmtISODate(ms){
   const d = new Date(ms);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const y = d.getFullYear();
+  return `${day}/${m}/${y}`;  // DD/MM/YYYY format
 }
 function setYearHeaders(){
   const y = new Date().getFullYear();
@@ -542,49 +542,142 @@ async function renderBenchmarksMetrics() {
     }
 
     const items = [
-      { label:"F/K", cat:"Değerleme", v: pick(["F/K", "Fiyat/Kazanç", "PE Ratio"]), fmt:(v)=>v.toFixed(2), ok:(v)=>v>0 && v<20 },
-        { label:"PD/DD", cat:"Değerleme", v: pick(["PD/DD", "Price to Book"]), fmt:(v)=>v.toFixed(2), ok:(v)=>v<3 },
-        { label:"Cari Oran", cat:"Likidite", v: pick(["Cari Oran"]), fmt:(v)=>v.toFixed(2), ok:(v)=>v>=1.5 },
-        { label:"Asit Test Oranı", cat:"Likidite", v: pick(["Asit Test Oranı"]), fmt:(v)=>v.toFixed(2), ok:(v)=>v>=1.0 },
-
-        { label:"Brüt Kar Marjı", cat:"Kârlılık", v: asPct01(pick(["Brüt Kar Marjı"])), fmt:(v)=>(v*100).toFixed(1)+"%", ok:(v)=>v>=0.30 },
-        { label:"Faaliyet Kar Marjı", cat:"Kârlılık", v: asPct01(pick(["Faaliyet Kâr Marjı","Faaliyet Kar Marjı"])), fmt:(v)=>(v*100).toFixed(1)+"%", ok:(v)=>v>=0.15 },
-
-        { label:"ROA", cat:"Kârlılık", v: asPct01(pick(["ROA"])), fmt:(v)=>(v*100).toFixed(1)+"%", ok:(v)=>v>=0.05 },
-        { label:"ROE", cat:"Kârlılık", v: asPct01(pick(["ROE"])), fmt:(v)=>(v*100).toFixed(1)+"%", ok:(v)=>v>=0.12 },
-        { label:"ROIC", cat:"Kârlılık", v: asPct01(pick(["ROIC"])), fmt:(v)=>(v*100).toFixed(1)+"%", ok:(v)=>v>=0.10 },
-
-        { label:"Borç / Öz Kaynak", cat:"Risk", v: pick(["Borç/Öz Kaynak","Borç / Öz Kaynak"]), fmt:(v)=>v.toFixed(2)+"x", ok:(v)=>v<=1.5 },
-
-        { label:"Stok Devir Hızı", cat:"Verimlilik", v: pick(["Stok Devir Hızı"]), fmt:(v)=>v.toFixed(2), ok:(v)=>v>=4 },
-        { label:"Alacak Devir Hızı", cat:"Verimlilik", v: pick(["Alacak Devir Hızı"]), fmt:(v)=>v.toFixed(2), ok:(v)=>v>=6 },
-        { label:"Borç Devir Hızı", cat:"Verimlilik", v: pick(["Borç Devir Hızı"]), fmt:(v)=>v.toFixed(2), ok:(v)=>v>=6 },
-
-        { label:"Nakit Döngüsü", cat:"Verimlilik", v: pick(["Nakit Döngüsü"]), fmt:(v)=>Math.round(v)+" gün", ok:(v)=>v<=60 },
-    ];
+  { 
+    label:"F/K", 
+    cat:"Değerleme", 
+    v: pick(["F/K", "Fiyat/Kazanç", "PE Ratio"]), 
+    fmt:(v)=>v.toFixed(2), 
+    badges: { good: "CAZİP", neutral: "UYGUN", bad: "PAHALI" },
+    ok:(v)=>v>0 && v<20 
+  },
+  { 
+    label:"PD/DD", 
+    cat:"Değerleme", 
+    v: pick(["PD/DD", "Price to Book"]), 
+    fmt:(v)=>v.toFixed(2), 
+    badges: { good: "UYGUN", neutral: "NORMAL", bad: "YÜKSEK" },
+    ok:(v)=>v<3 
+  },
+  { 
+    label:"Cari Oran", 
+    cat:"Likidite", 
+    v: pick(["Cari Oran"]), 
+    fmt:(v)=>v.toFixed(2), 
+    badges: { good: "SAĞLAM", neutral: "ORTA", bad: "ZAYIF" },
+    ok:(v)=>v>=1.5 
+  },
+  { 
+    label:"Asit Test Oranı", 
+    cat:"Likidite", 
+    v: pick(["Asit Test Oranı"]), 
+    fmt:(v)=>v.toFixed(2), 
+    badges: { good: "GÜÇLÜ", neutral: "YETERLİ", bad: "ZAYIF" },
+    ok:(v)=>v>=1.0 
+  },
+  { 
+    label:"Brüt Kar Marjı", 
+    cat:"Kârlılık", 
+    v: asPct01(pick(["Brüt Kar Marjı"])), 
+    fmt:(v)=>(v*100).toFixed(1)+"%", 
+    badges: { good: "GÜÇLÜ", neutral: "ORTA", bad: "ZAYIF" },
+    ok:(v)=>v>=0.30 
+  },
+  { 
+    label:"Faaliyet Kar Marjı", 
+    cat:"Kârlılık", 
+    v: asPct01(pick(["Faaliyet Kâr Marjı","Faaliyet Kar Marjı"])), 
+    fmt:(v)=>(v*100).toFixed(1)+"%", 
+    badges: { good: "GÜÇLÜ", neutral: "ORTA", bad: "DÜŞÜK" },
+    ok:(v)=>v>=0.15 
+  },
+  { 
+    label:"ROA", 
+    cat:"Kârlılık", 
+    v: asPct01(pick(["ROA"])), 
+    fmt:(v)=>(v*100).toFixed(1)+"%", 
+    badges: { good: "YÜK SEK", neutral: "NORMAL", bad: "DÜŞÜK" },
+    ok:(v)=>v>=0.05 
+  },
+  { 
+    label:"ROE", 
+    cat:"Kârlılık", 
+    v: asPct01(pick(["ROE"])), 
+    fmt:(v)=>(v*100).toFixed(1)+"%", 
+    badges: { good: "GÜÇLÜ", neutral: "ORTA", bad: "ZAYIF" },
+    ok:(v)=>v>=0.12 
+  },
+  { 
+    label:"ROIC", 
+    cat:"Kârlılık", 
+    v: asPct01(pick(["ROIC"])), 
+    fmt:(v)=>(v*100).toFixed(1)+"%", 
+    badges: { good: "MÜKEMMasEL", neutral: "İYİ", bad: "ZAYIF" },
+    ok:(v)=>v>=0.10 
+  },
+  { 
+    label:"Borç / Öz Kaynak", 
+    cat:"Risk", 
+    v: pick(["Borç/Öz Kaynak","Borç / Öz Kaynak"]), 
+    fmt:(v)=>v.toFixed(2)+"x", 
+    badges: { good: "SAĞLAM", neutral: "DENGELİ", bad: "RİSKLİ" },
+    ok:(v)=>v<=1.5 
+  },
+  { 
+    label:"Stok Devir Hızı", 
+    cat:"Verimlilik", 
+    v: pick(["Stok Devir Hızı"]), 
+    fmt:(v)=>v.toFixed(2), 
+    badges: { good: "HIZLI", neutral: "NORMAL", bad: "YAVAŞ" },
+    ok:(v)=>v>=4 
+  },
+  { 
+    label:"Alacak Devir Hızı", 
+    cat:"Verimlilik", 
+    v: pick(["Alacak Devir Hızı"]), 
+    fmt:(v)=>v.toFixed(2), 
+    badges: { good: "HIZLI", neutral: "NORMAL", bad: "YAVAŞ" },
+    ok:(v)=>v>=6 
+  },
+  { 
+    label:"Borç Devir Hızı", 
+    cat:"Verimlilik", 
+    v: pick(["Borç Devir Hızı"]), 
+    fmt:(v)=>v.toFixed(2), 
+    badges: { good: "HIZLI", neutral: "NORMAL", bad: "YAVAŞ" },
+    ok:(v)=>v>=6 
+  },
+  { 
+    label:"Nakit Döngüsü", 
+    cat:"Verimlilik", 
+    v: pick(["Nakit Döngüsü"]), 
+    fmt:(v)=>Math.round(v)+" gün", 
+    badges: { good: "HIZLI", neutral: "NORMAL", bad: "YAVAŞ" },
+    ok:(v)=>v<=60 
+  },
+];
 
     listEl.innerHTML = items.map(it => {
-        const has = (it.v !== null && it.v !== undefined);
-        const num = Number(it.v);
-        const good = has ? it.ok(num) : null;
+  const has = (it.v !== null && it.v !== undefined);
+  const num = Number(it.v);
+  const good = has ? it.ok(num) : null;
 
-        const badgeText = (good === null) ? "—" : (good ? "GÜÇLÜ" : "ZAYIF");
-        const badgeClass = (good === null) ? "badge" : (good ? "badge neon" : "badge");
-        const display = has ? it.fmt(num) : "-";
+  const badgeText = (good === null) ? "—" : (good ? it.badges.good : it.badges.bad);
+  const badgeClass = (good === null) ? "badge" : (good ? "badge neon" : "badge");
+  const display = has ? it.fmt(num) : "-";
 
-        return `
-      <div class="metric-row">
-        <div class="flex flex-col">
-          <span class="text-white text-sm font-semibold">${it.label}</span>
-          <div class="mt-1"><span class="badge">${it.cat}</span></div>
-        </div>
-        <div class="flex items-center gap-3">
-          <span class="text-white font-extrabold text-sm tracking-wide">${display}</span>
-          <span class="${badgeClass}">${badgeText}</span>
-        </div>
+  return `
+    <div class="metric-row">
+      <div class="flex flex-col">
+        <span class="text-white text-sm font-semibold">${it.label}</span>
+        <div class="mt-1"><span class="badge">${it.cat}</span></div>
       </div>
-    `;
-    }).join("");
+      <div class="flex items-center gap-3">
+        <span class="text-white font-extrabold text-sm tracking-wide">${display}</span>
+        <span class="${badgeClass}">${badgeText}</span>
+      </div>
+    </div>
+  `;
+}).join("");
 
     toggleOverviewMetricsCard(getActiveFinancialTab());
 }
@@ -668,24 +761,40 @@ function renderNews(){
   };
 
   container.innerHTML = apiNews.map(n => {
-    const dateText = n?.ts ? fmtDate(n.ts) : (n?.date || "");
-    const url = String(n?.link || "").trim();
-    const isValid = !!url && url !== "#";
-    const senti = String(n?.sentiment || "").trim();
+  const dateText = n?.ts ? fmtDate(n.ts) : (n?.date || "");
+  let url = String(n?.link || "").trim();
+  
+  // UTM parametresi ekle
+  if (url && url !== "#") {
+    const separator = url.includes('?') ? '&' : '?';
+    url = url + separator + 'utm_source=finapsis.co';
+  }
+  
+  const isValid = !!url && url !== "#";
+  const senti = String(n?.sentiment || "").trim();
+  
+  // Sentiment CSS class
+  let sentiClass = '';
+  if (senti) {
+    const s = senti.toLowerCase();
+    if (s.includes('olumlu') || s.includes('positive')) sentiClass = 'sentiment-olumlu';
+    else if (s.includes('olumsuz') || s.includes('negative')) sentiClass = 'sentiment-olumsuz';
+    else sentiClass = 'sentiment-notr';
+  }
 
-    return `
-      <a href="${isValid ? url : "javascript:void(0)"}" class="news-item group" ${isValid ? 'target="_blank" rel="noopener"' : ""}>
-        <div class="flex justify-between items-center mb-1">
-          <span class="text-[10px] text-[#888] font-extrabold uppercase tracking-widest">${n?.source || "Kaynak"}</span>
-          <span class="text-[10px] text-[#555] font-black uppercase tracking-widest">${dateText}</span>
-        </div>
-        <div class="text-[#ddd] text-xs font-semibold leading-snug group-hover:text-[#c2f50e] transition-colors">
-          ${n?.title || "-"}
-        </div>
-        ${senti ? `<div class="mt-2"><span class="badge neon">${senti}</span></div>` : ``}
-      </a>
-    `;
-  }).join("");
+  return `
+    <a href="${isValid ? url : "javascript:void(0)"}" class="news-item group" ${isValid ? 'target="_blank" rel="noopener"' : ""}>
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-[10px] text-[#888] font-extrabold uppercase tracking-widest">${n?.source || "Kaynak"}</span>
+        <span class="text-[10px] text-[#555] font-black uppercase tracking-widest">${dateText}</span>
+      </div>
+      <div class="text-[#ddd] text-xs font-semibold leading-snug group-hover:text-[#c2f50e] transition-colors">
+        ${n?.title || "-"}
+      </div>
+      ${senti ? `<div class="mt-2"><span class="badge ${sentiClass}">${senti}</span></div>` : ``}
+    </a>
+  `;
+}).join("");
 
   requestSendHeight(false);
 }
@@ -818,9 +927,9 @@ function render52w(){
 
   document.getElementById("rangeFill").style.width = pct + "%";
   document.getElementById("rangeThumb").style.left = pct + "%";
-  document.getElementById("currentPriceLabel").innerText = formatPrice(displayCurrent);
-  document.getElementById("lowPrice").innerText = formatPrice(displayLow);
-  document.getElementById("highPrice").innerText = formatPrice(displayHigh);
+  document.getElementById("currentPriceLabel").innerText = sym + formatPrice(displayCurrent);
+document.getElementById("lowPrice").innerText = sym + formatPrice(displayLow);
+document.getElementById("highPrice").innerText = sym + formatPrice(displayHigh);
 
   const live = getLivePriceFromGlobal(currentTicker);
   let shownPrice = (live.cur !== null && live.cur > 0) ? live.cur : current;
@@ -1038,7 +1147,7 @@ function ensureChart(rangeKey){
     }
 
     const volumeOptions = {
-      series: [{ name: "Volume", data: pack.points.map(p => ({ x: p.x, y: p.v || 0 })) }],
+      series: [{ name: "Hacim", data: pack.points.map(p => ({ x: p.x, y: p.v || 0 })) }],
       chart: { type: "bar", height: 120, fontFamily: "Inter", toolbar: { show: false }, background: "transparent", zoom: { enabled: false } },
       theme: { mode: "dark" },
       colors: ["rgba(194, 245, 14, 0.5)"],
