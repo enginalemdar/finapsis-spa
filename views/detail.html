@@ -16,16 +16,6 @@
       <div>
         <div class="flex items-center gap-2 mb-1">
           <span id="tickerPill" class="bg-[#1a2205] text-[#c2f50e] border border-[#c2f50e]/30 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wide">-</span>
-          
-          <!-- View badges like BORSA badges in companies -->
-          <span class="view-badge active" data-view="temel">TEMEL</span>
-          <span class="view-badge" data-view="teknik">TEKNİK</span>
-          
-          <!-- Menu icon -->
-          <button id="tickerMenuBtn" class="w-7 h-7 rounded flex items-center justify-center hover:bg-white/5 transition-colors relative">
-            <i class="fa-solid fa-ellipsis-vertical text-sm text-[#8a8a8a]"></i>
-          </button>
-          
           <span class="text-[10px] font-extrabold text-[#8a8a8a] uppercase tracking-widest">Şirket Detayı</span>
         </div>
         <h1 id="companyTitle" class="text-2xl font-extrabold text-white tracking-tight leading-tight">-</h1>
@@ -59,17 +49,28 @@
       </div>
 
       <div class="fin-card p-5">
-        <div class="flex justify-between items-center mb-3 gap-3">
+        <div class="flex justify-between items-center mb-3 gap-3 flex-wrap">
           <h3 class="text-white font-extrabold text-sm" id="chartTitle">Hisse Fiyatı</h3>
+          
+          <div class="flex gap-2" id="chartTypeToggle">
+            <button class="chart-type-btn active" data-type="area" onclick="setChartType('area')" type="button">Area</button>
+            <button class="chart-type-btn" data-type="candlestick" onclick="setChartType('candlestick')" type="button">Mum</button>
+          </div>
+
           <div class="flex gap-2 flex-wrap justify-end" id="rangeBtns" aria-label="Zaman aralığı">
-            <button class="tab-btn" data-range="MAX" type="button">MAX</button>
-            <button class="tab-btn active" data-range="1Y" type="button">1Y</button>
-            <button class="tab-btn" data-range="6M" type="button">6A</button>
-            <button class="tab-btn" data-range="3M" type="button">3A</button>
-            <button class="tab-btn" data-range="1M" type="button">1A</button>
+            <button class="range-btn" data-range="1H" onclick="ensureChart('1H')" type="button">1H</button>
+            <button class="range-btn" data-range="1A" onclick="ensureChart('1A')" type="button">1A</button>
+            <button class="range-btn" data-range="3A" onclick="ensureChart('3A')" type="button">3A</button>
+            <button class="range-btn" data-range="6A" onclick="ensureChart('6A')" type="button">6A</button>
+            <button class="range-btn active" data-range="1Y" onclick="ensureChart('1Y')" type="button">1Y</button>
+            <button class="range-btn" data-range="YTD" onclick="ensureChart('YTD')" type="button">YTD</button>
+            <button class="range-btn" data-range="5Y" onclick="ensureChart('5Y')" type="button">5Y</button>
+            <button class="range-btn" data-range="MAX" onclick="ensureChart('MAX')" type="button">MAX</button>
           </div>
         </div>
+        
         <div id="priceChart" class="-ml-2"></div>
+        <div id="volumeChart" class="-ml-2" style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;"></div>
       </div>
 
       <div class="fin-card flex flex-col" id="cardFinancials"> <div class="card-head tab-scroll" id="financialTabs" role="tablist" aria-label="Finansal tablolar">
@@ -168,123 +169,46 @@
   </div>
   <div class="h-10"></div>
 </div>
-<!-- Ticker Menu Popup -->
-<div id="tickerMenuPopup" class="fixed hidden z-50 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg shadow-2xl min-w-[180px]">
-  <div class="p-2">
-    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors flex items-center gap-2">
-      <i class="fa-solid fa-arrow-trend-up text-green-500"></i>
-      <span>AL</span>
-    </button>
-    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors flex items-center gap-2">
-      <i class="fa-solid fa-arrow-trend-down text-red-500"></i>
-      <span>SAT</span>
-    </button>
-    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors flex items-center gap-2">
-      <i class="fa-solid fa-bell text-[#c2f50e]"></i>
-      <span>Alarm Kur</span>
-    </button>
-    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors flex items-center gap-2">
-      <i class="fa-solid fa-chart-line text-blue-500"></i>
-      <span>Portföye Ekle</span>
-    </button>
-  </div>
-</div>
 
 <style>
-/* View badges like BORSA badges */
-.view-badge {
-  display: inline-block;
-  padding: 3px 8px;
+.chart-type-btn {
+  padding: 6px 12px;
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 4px;
-  color: #8a8a8a;
-  font-size: 10px;
-  font-weight: 900;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
 }
 
-.view-badge.active {
-  background: rgba(194,245,14,0.12);
-  border-color: rgba(194,245,14,0.4);
+.chart-type-btn.active {
+  background: rgba(194,245,14,0.12) !important;
+  border-color: rgba(194,245,14,0.4) !important;
+  color: #c2f50e !important;
+}
+
+.range-btn {
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 38px;
+}
+
+.range-btn.active {
+  background: rgba(194,245,14,0.15);
+  border-color: #c2f50e;
   color: #c2f50e;
 }
 
-.view-badge:hover:not(.active) {
-  background: rgba(255,255,255,0.08);
-}
-
-/* Sentiment badge colors (match styles.css) */
-.badge.positive {
-  background: rgba(34, 197, 94, 0.15);
-  border-color: rgba(34, 197, 94, 0.3);
-  color: #22c55e;
-}
-
-.badge.negative {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #ef4444;
-}
-
-.badge.neutral {
-  background: rgba(156, 163, 175, 0.15);
-  border-color: rgba(156, 163, 175, 0.3);
-  color: #9ca3af;
-}
-
-/* Metric badges */
-.metric-badge {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.metric-badge.strong {
-  background: rgba(34, 197, 94, 0.15);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  color: #22c55e;
-}
-
-.metric-badge.weak {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #ef4444;
-}
-
-.metric-badge.neutral {
-  background: rgba(156, 163, 175, 0.15);
-  border: 1px solid rgba(156, 163, 175, 0.3);
-  color: #9ca3af;
-}
-
-.overview-metric-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-top: 1px solid rgba(255,255,255,0.05);
-}
-
-.overview-metric-item:first-child {
-  border-top: none;
-  padding-top: 0;
-}
-
-.metric-label {
-  font-size: 12px;
-  color: #8a8a8a;
-  font-weight: 600;
-}
-
-.metric-value {
-  font-size: 14px;
-  color: #fff;
-  font-weight: 700;
+#volumeChart:empty {
+  display: none;
 }
 </style>
