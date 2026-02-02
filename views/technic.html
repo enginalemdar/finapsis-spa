@@ -3,32 +3,186 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Finapsis • Teknik Analiz</title>
+  <title>Finapsis • Teknik Sinyaller</title>
+
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-  <link rel="stylesheet" href="/styles.css">
+
+  <style>
+    :root{
+      --bg:#050505; --panel:#0b0b0b; --panel2:#0f0f10;
+      --text:#eaeaea; --muted:#a3a3a3; --line:#1d1d1d;
+      --lime:#c2f50e; --green:#31c48d; --amber:#ffd166; --red:#ff4d4d;
+      --radius:18px; --shadow: 0 18px 40px rgba(0,0,0,.45);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background:
+        radial-gradient(900px 600px at 10% 10%, rgba(194,245,14,.10), transparent 60%),
+        radial-gradient(900px 600px at 90% 0%, rgba(194,245,14,.06), transparent 55%),
+        var(--bg);
+      color:var(--text);
+    }
+    .wrap{max-width:1320px; margin:22px auto; padding:0 16px;}
+    header{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px;}
+    h1{margin:0; font-size:16px; letter-spacing:.2px}
+    .sub{font-size:12px; color:var(--muted); margin-top:6px}
+    .controls{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    input, button, select{
+      background: rgba(10,10,10,.85);
+      color: var(--text);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      padding:10px 12px;
+      outline:none;
+      font-size:13px;
+      box-shadow: 0 8px 16px rgba(0,0,0,.25) inset;
+    }
+    input{min-width:160px}
+    button{
+      cursor:pointer;
+      background: linear-gradient(180deg, rgba(194,245,14,.20), rgba(194,245,14,.06));
+      border-color: rgba(194,245,14,.30);
+    }
+    button:hover{filter:brightness(1.06)}
+
+    .grid{display:grid; grid-template-columns: 380px 1fr; gap:14px;}
+    @media(max-width:1000px){ .grid{grid-template-columns: 1fr;} }
+
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015));
+      border:1px solid rgba(255,255,255,.06);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+    .panel::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background: radial-gradient(600px 240px at 20% 0%, rgba(194,245,14,.09), transparent 55%);
+      pointer-events:none;
+    }
+    .panel > .inner{position:relative; padding:14px;}
+
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:7px 12px; border-radius:999px;
+      background: rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.08);
+      font-size:12px; color: var(--muted);
+      user-select:none;
+    }
+    .dot{width:8px; height:8px; border-radius:999px; background: rgba(255,255,255,.35);}
+    .dot.lime{background: var(--lime)}
+    .dot.green{background: var(--green)}
+    .dot.amber{background: var(--amber)}
+    .dot.red{background: var(--red)}
+
+    .split{display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-top:12px;}
+    .muted{color:var(--muted)}
+    .big{font-size:20px; font-weight:720; letter-spacing:.2px;}
+    .kpi{padding:12px 0; border-top:1px dashed rgba(255,255,255,.08);}
+    .kpi:first-of-type{border-top:none; padding-top:0}
+    .label{font-size:12px; color:var(--muted)}
+    .val{font-size:18px; font-weight:720}
+    .mini{font-size:12px; color:var(--muted); margin-top:4px}
+    .barrow{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px;}
+    .bar{flex:1; height:10px; border-radius:999px; background:#101010; border:1px solid rgba(255,255,255,.08); overflow:hidden;}
+    .bar i{display:block; height:100%; width:0%; background: linear-gradient(90deg, rgba(194,245,14,.12), rgba(194,245,14,.95)); box-shadow: 0 0 18px rgba(194,245,14,.25);}
+    .scale{font-size:12px; color:var(--muted); min-width:54px; text-align:right}
+
+    .signalBadge{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:7px 12px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.35);
+      font-size:12px; color:#eaeaea;
+      white-space:nowrap;
+    }
+
+    .chartTopbar{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+    .legend{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    .legend .pill{cursor:pointer;}
+    .legend .pill.off{opacity:.45; filter:saturate(.5);}
+
+    .chartWrap{
+      height: 640px;
+      border-radius: var(--radius);
+      border:1px solid rgba(255,255,255,.06);
+      overflow:hidden;
+      background:#070707;
+      box-shadow: var(--shadow);
+      position:relative;
+    }
+
+    .tags{margin-top:10px}
+    .tag{
+      display:inline-flex; align-items:center;
+      padding:6px 10px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.02);
+      color:#d9d9d9; font-size:12px;
+      margin:4px 6px 0 0;
+    }
+
+    .alert{
+      margin-top:12px;
+      background: rgba(0,0,0,.28);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius: 16px;
+      padding:14px;
+    }
+    .alertHead{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;}
+    .alertTitle{font-size:18px; font-weight:750}
+    .sev{display:inline-flex; align-items:center; gap:8px; padding:7px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.03); font-size:12px;}
+    .sev.low .dot{background: rgba(255,255,255,.35)}
+    .sev.medium .dot{background: var(--amber)}
+    .sev.high .dot{background: var(--red)}
+    .alertText{font-size:13px; color:#d9d9d9; line-height:1.55}
+    .alertHint{font-size:12px; color:var(--muted); margin-top:6px}
+
+    .err{margin-top:10px; color: var(--red); font-size:13px; white-space:pre-wrap;}
+
+    /* Custom tooltip */
+    .tv-tooltip{
+      position:absolute;
+      z-index: 20;
+      pointer-events:none;
+      background: rgba(0,0,0,.70);
+      border: 1px solid rgba(255,255,255,.10);
+      backdrop-filter: blur(8px);
+      border-radius: 14px;
+      padding:10px 12px;
+      color:#eaeaea;
+      min-width: 220px;
+      box-shadow: 0 14px 26px rgba(0,0,0,.45);
+      transform: translate(-50%, -120%);
+      display:none;
+    }
+    .tv-tooltip .tdate{font-size:12px; color:var(--muted); margin-bottom:6px}
+    .tv-tooltip .row{display:flex; justify-content:space-between; gap:10px; font-size:12px; line-height:1.55;}
+    .tv-tooltip .row b{font-weight:750}
+  </style>
 </head>
 
 <body>
 <div class="wrap">
-  <!-- Header - consistent with detail.html -->
+  <!-- Consistent header with detail.html -->
   <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
     <div class="flex items-center gap-4">
-      <div class="w-14 h-14 bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl flex items-center justify-center p-2 overflow-hidden">
-        <img id="companyLogo" src="" alt="" class="w-full h-full object-contain hidden" />
-        <i id="companyLogoFallback" class="fa-solid fa-chart-line text-2xl text-white"></i>
+      <div class="w-14 h-14 bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl flex items-center justify-center p-2">
+        <i class="fa-solid fa-chart-line text-2xl text-white"></i>
       </div>
 
       <div>
         <div class="flex items-center gap-2 mb-1">
           <span id="tickerPill" class="bg-[#1a2205] text-[#c2f50e] border border-[#c2f50e]/30 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wide">-</span>
           
-          <!-- View toggle badges -->
-          <div class="flex gap-1">
-            <button class="view-badge" data-view="temel" onclick="switchView('temel')">Temel</button>
-            <button class="view-badge active" data-view="teknik" onclick="switchView('teknik')">Teknik</button>
-          </div>
+          <span class="view-badge" data-view="temel">TEMEL</span>
+          <span class="view-badge active" data-view="teknik">TEKNİK</span>
           
-          <!-- Menu icon -->
           <button id="tickerMenuBtn" class="w-7 h-7 rounded flex items-center justify-center hover:bg-white/5 transition-colors">
             <i class="fa-solid fa-ellipsis-vertical text-sm text-[#8a8a8a]"></i>
           </button>
@@ -39,105 +193,102 @@
     </div>
 
     <div class="flex flex-col items-end gap-3 w-full md:w-auto">
-      <!-- Search -->
       <div class="flex items-center gap-2 search-wrap">
-        <input id="tickerSearch" class="search-input" placeholder="Şirket ara (ticker / isim)" autocomplete="off" />
+        <input id="tickerSearch" class="search-input" placeholder="Şirket ara..." autocomplete="off" />
         <div id="searchDD" class="search-dd"></div>
       </div>
 
-      <!-- Lookback badge (popup) -->
-      <div class="relative">
-        <button id="lookbackBtn" class="px-3 py-1.5 bg-[#0f0f0f] border border-[#2a2a2a] rounded text-xs font-bold text-white hover:bg-[#1a1a1a] transition-colors">
-          <i class="fa-solid fa-clock text-[10px] mr-1.5"></i>
-          <span id="lookbackLabel">400</span>
-        </button>
-        <div id="lookbackPopup" class="absolute right-0 mt-1 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg shadow-xl p-2 hidden min-w-[160px] z-50">
-          <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors" data-lookback="400">400 Gün</button>
-          <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors" data-lookback="800">800 Gün</button>
-          <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors" data-lookback="1200">1200 Gün</button>
-          <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors" data-lookback="2500">2500 Gün</button>
+      <div class="flex items-center gap-2">
+        <div class="relative">
+          <button id="lookbackBtn" class="px-3 py-1.5 bg-[#0f0f0f] border border-[#2a2a2a] rounded text-xs font-bold text-white hover:bg-[#1a1a1a]">
+            <i class="fa-solid fa-clock text-[10px] mr-1.5"></i>
+            <span id="lookbackLabel">400</span>
+          </button>
+          <div id="lookbackPopup" class="absolute right-0 mt-1 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg shadow-xl p-2 hidden min-w-[120px] z-50">
+            <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded" data-lookback="400">400</button>
+            <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded" data-lookback="800">800</button>
+            <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded" data-lookback="1200">1200</button>
+            <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded" data-lookback="2500">2500</button>
+          </div>
         </div>
+        
+        <button id="runBtn" class="px-4 py-1.5 bg-gradient-to-r from-[#c2f50e]/20 to-[#c2f50e]/10 border border-[#c2f50e]/30 rounded text-xs font-bold text-[#c2f50e] hover:brightness-110">Yükle</button>
       </div>
     </div>
   </div>
 
-  <!-- Grid -->
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-    <!-- Left Panel (4 cols) -->
-    <div class="lg:col-span-4 flex flex-col gap-6">
-      <div class="fin-card p-5">
-        <div class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest mb-4">Özet</div>
+  <input id="ticker" type="hidden" value="A" />
 
-        <div class="flex justify-between items-start mb-4">
+  <div class="grid">
+    <!-- LEFT -->
+    <div class="panel">
+      <div class="inner">
+        <div class="pill"><span class="dot lime"></span> Özet</div>
+
+        <div class="split" style="margin-top:14px;">
           <div>
-            <div class="text-[#6b6b6b] text-[10px] font-black uppercase">Ticker</div>
-            <div class="text-2xl font-extrabold text-white" id="sumTicker">—</div>
-            <div class="text-xs text-[#8a8a8a] mt-1">AsOf: <span id="sumAsOf">—</span></div>
+            <div class="label">Ticker</div>
+            <div class="big" id="sumTicker">—</div>
+            <div class="mini muted">AsOf: <span id="sumAsOf">—</span></div>
           </div>
           <div class="signalBadge" id="sumSignal"><span class="dot"></span> —</div>
         </div>
 
-        <div class="border-t border-white/5 pt-4 mt-4">
-          <div class="text-[#6b6b6b] text-[10px] font-black uppercase mb-2">Skor</div>
-          <div class="flex justify-between items-center mb-2">
-            <div class="text-xl font-extrabold text-white"><span id="sumScore">—</span> <span class="text-[#8a8a8a]">/ 100</span></div>
-            <div class="text-xs text-[#8a8a8a]" id="sumMomRisk">—</div>
+        <div class="kpi" style="margin-top:14px;">
+          <div class="label">Skor</div>
+          <div class="split" style="margin-top:6px;">
+            <div class="val"><span id="sumScore">—</span> <span class="muted">/ 100</span></div>
+            <div class="mini muted" id="sumMomRisk">—</div>
           </div>
-          <div class="flex items-center gap-2">
-            <div class="flex-1 h-2 bg-[#0f0f0f] border border-white/10 rounded-full overflow-hidden">
-              <div id="scoreBar" class="h-full bg-gradient-to-r from-[#c2f50e]/20 to-[#c2f50e]" style="width:0%"></div>
-            </div>
-            <div class="text-xs text-[#6b6b6b] min-w-[40px] text-right">0-100</div>
+          <div class="barrow">
+            <div class="bar"><i id="scoreBar"></i></div>
+            <div class="scale">0-100</div>
           </div>
         </div>
 
-        <div class="border-t border-white/5 pt-4 mt-4">
-          <div class="flex justify-between items-start">
+        <div class="kpi">
+          <div class="split">
             <div>
-              <div class="text-[#6b6b6b] text-[10px] font-black uppercase">Son Kapanış</div>
-              <div class="text-xl font-extrabold text-white" id="sumClose">—</div>
-              <div class="text-xs text-[#8a8a8a] mt-1">Hacim: <span id="sumVol">—</span></div>
+              <div class="label">Son Kapanış</div>
+              <div class="val" id="sumClose">—</div>
+              <div class="mini muted">Hacim: <span id="sumVol">—</span></div>
             </div>
             <div class="signalBadge" id="sumTrend"><span class="dot"></span> Trend: —</div>
           </div>
         </div>
 
-        <div class="border-t border-white/5 pt-4 mt-4">
-          <div class="flex justify-between items-start">
+        <div class="kpi">
+          <div class="split">
             <div>
-              <div class="text-[#6b6b6b] text-[10px] font-black uppercase">RSI(14)</div>
-              <div class="text-xl font-extrabold text-white" id="sumRSI">—</div>
-              <div class="text-xs text-[#8a8a8a] mt-1">Vol/Ort20: <span id="sumVolVs">—</span></div>
+              <div class="label">RSI(14)</div>
+              <div class="val" id="sumRSI">—</div>
+              <div class="mini muted">Vol/Ort20: <span id="sumVolVs">—</span></div>
             </div>
-            <div class="min-w-[120px]">
-              <div class="h-2 bg-[#0f0f0f] border border-white/10 rounded-full overflow-hidden">
-                <div id="rsiBar" class="h-full bg-gradient-to-r from-[#c2f50e]/20 to-[#c2f50e]" style="width:0%"></div>
-              </div>
-              <div class="text-xs text-[#6b6b6b] text-right mt-1">0-100</div>
+            <div style="min-width:140px">
+              <div class="bar"><i id="rsiBar"></i></div>
+              <div class="mini muted" style="margin-top:6px; text-align:right">0-100</div>
             </div>
           </div>
         </div>
 
-        <div class="border-t border-white/5 pt-4 mt-4">
-          <div class="text-[#6b6b6b] text-[10px] font-black uppercase mb-2">Seviyeler</div>
-          <div class="text-xs text-[#d9d9d9]" id="sumLevels">—</div>
+        <div class="kpi">
+          <div class="label">Seviyeler</div>
+          <div class="mini muted" id="sumLevels">—</div>
         </div>
       </div>
     </div>
 
-    <!-- Right Panel (8 cols) -->
-    <div class="lg:col-span-8 flex flex-col gap-6">
-      <div class="fin-card p-5">
-        <div class="flex justify-between items-center mb-4">
-          <div class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest">Grafik</div>
-          
-          <!-- Legend -->
-          <div id="legend" class="flex gap-2 flex-wrap">
-            <span class="legend-pill" data-key="ema20"><span class="dot green"></span> EMA20</span>
-            <span class="legend-pill" data-key="ema50"><span class="dot amber"></span> EMA50</span>
-            <span class="legend-pill" data-key="volume"><span class="dot"></span> Hacim</span>
-            <span class="legend-pill" data-key="sr"><span class="dot"></span> S/R</span>
-            <span class="legend-pill" data-key="user"><span class="dot"></span> User</span>
+    <!-- RIGHT -->
+    <div class="panel">
+      <div class="inner">
+        <div class="chartTopbar">
+          <div class="pill"><span class="dot"></span> Grafik</div>
+          <div class="legend" id="legend">
+            <span class="pill" data-key="ema20"><span class="dot green"></span> EMA20</span>
+            <span class="pill" data-key="ema50"><span class="dot amber"></span> EMA50</span>
+            <span class="pill" data-key="volume"><span class="dot"></span> Hacim</span>
+            <span class="pill" data-key="sr"><span class="dot"></span> Destek/Direnç</span>
+            <span class="pill" data-key="user"><span class="dot"></span> Kullanıcı Çizgileri</span>
           </div>
         </div>
 
@@ -152,35 +303,13 @@
           </div>
         </div>
 
-        <div class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest mt-4 mb-2">Etiketler & Uyarılar</div>
-        <div id="tags" class="flex flex-wrap gap-2"></div>
-        <div id="alerts" class="mt-4"></div>
+        <div class="pill" style="margin-top:12px;"><span class="dot"></span> Etiketler & Uyarılar</div>
+        <div id="tags" class="tags"></div>
+        <div id="alerts"></div>
 
-        <div id="err" class="text-red-500 text-sm mt-4"></div>
+        <div id="err" class="err"></div>
       </div>
     </div>
-  </div>
-</div>
-
-<!-- Ticker Menu Popup (same as companies) -->
-<div id="tickerMenuPopup" class="fixed hidden z-50 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg shadow-2xl min-w-[180px]">
-  <div class="p-2">
-    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors flex items-center gap-2">
-      <i class="fa-solid fa-arrow-trend-up text-green-500"></i>
-      <span>AL</span>
-    </button>
-    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors flex items-center gap-2">
-      <i class="fa-solid fa-arrow-trend-down text-red-500"></i>
-      <span>SAT</span>
-    </button>
-    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors flex items-center gap-2">
-      <i class="fa-solid fa-bell text-[#c2f50e]"></i>
-      <span>Alarm Kur</span>
-    </button>
-    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded transition-colors flex items-center gap-2">
-      <i class="fa-solid fa-chart-line text-blue-500"></i>
-      <span>Portföye Ekle</span>
-    </button>
   </div>
 </div>
 
@@ -188,15 +317,34 @@
 </body>
 </html>
 
+<!-- Menu Popup -->
+<div id="tickerMenuPopup" class="fixed hidden z-50 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg shadow-2xl min-w-[180px]">
+  <div class="p-2">
+    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded flex items-center gap-2">
+      <i class="fa-solid fa-arrow-trend-up text-green-500"></i><span>AL</span>
+    </button>
+    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded flex items-center gap-2">
+      <i class="fa-solid fa-arrow-trend-down text-red-500"></i><span>SAT</span>
+    </button>
+    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded flex items-center gap-2">
+      <i class="fa-solid fa-bell text-[#c2f50e]"></i><span>Alarm Kur</span>
+    </button>
+    <button class="w-full text-left px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a1a1a] rounded flex items-center gap-2">
+      <i class="fa-solid fa-chart-line text-blue-500"></i><span>Portföye Ekle</span>
+    </button>
+  </div>
+</div>
+
 <style>
 .view-badge {
-  padding: 4px 10px;
+  display: inline-block;
+  padding: 3px 8px;
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 4px;
   color: #8a8a8a;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 900;
   cursor: pointer;
   transition: all 0.2s;
   text-transform: uppercase;
@@ -208,154 +356,55 @@
   color: #c2f50e;
 }
 
-.signalBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(0,0,0,0.35);
-  font-size: 11px;
-  color: #eaeaea;
-  white-space: nowrap;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.35);
-}
-
-.dot.lime { background: #c2f50e; }
-.dot.green { background: #31c48d; }
-.dot.amber { background: #ffd166; }
-.dot.red { background: #ff4d4d; }
-
-.legend-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  font-size: 11px;
-  color: #a3a3a3;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.legend-pill:hover {
-  background: rgba(255,255,255,0.06);
-}
-
-.legend-pill.off {
-  opacity: 0.45;
-  filter: saturate(0.5);
-}
-
-.chartWrap {
-  height: 640px;
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,0.06);
-  overflow: hidden;
-  background: #070707;
+.search-wrap {
   position: relative;
 }
 
-.tv-tooltip {
+.search-input {
+  padding: 8px 12px;
+  background: #0f0f0f;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: white;
+  font-size: 12px;
+  outline: none;
+  min-width: 200px;
+}
+
+.search-dd {
   position: absolute;
-  z-index: 20;
-  pointer-events: none;
-  background: rgba(0,0,0,0.7);
-  border: 1px solid rgba(255,255,255,0.1);
-  backdrop-filter: blur(8px);
-  border-radius: 14px;
-  padding: 10px 12px;
-  color: #eaeaea;
-  min-width: 220px;
-  box-shadow: 0 14px 26px rgba(0,0,0,0.45);
-  transform: translate(-50%, -120%);
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #0f0f0f;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  margin-top: 4px;
+  max-height: 300px;
+  overflow-y: auto;
   display: none;
+  z-index: 50;
 }
 
-.tv-tooltip .tdate {
-  font-size: 12px;
-  color: #a3a3a3;
-  margin-bottom: 6px;
+.search-item {
+  padding: 10px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
-.tv-tooltip .row {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
-  line-height: 1.55;
+.search-item:hover {
+  background: rgba(255,255,255,0.05);
 }
 
-.tv-tooltip .row b {
-  font-weight: 750;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.02);
-  color: #d9d9d9;
+.search-ticker {
   font-size: 11px;
+  font-weight: 800;
+  color: #c2f50e;
 }
 
-.alert {
-  margin-top: 12px;
-  background: rgba(0,0,0,0.28);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  padding: 14px;
-}
-
-.alertHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.alertTitle {
-  font-size: 16px;
-  font-weight: 750;
-}
-
-.sev {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.03);
-  font-size: 11px;
-}
-
-.sev.low .dot { background: rgba(255,255,255,0.35); }
-.sev.medium .dot { background: #ffd166; }
-.sev.high .dot { background: #ff4d4d; }
-
-.alertText {
-  font-size: 13px;
-  color: #d9d9d9;
-  line-height: 1.55;
-}
-
-.alertHint {
-  font-size: 12px;
-  color: #a3a3a3;
-  margin-top: 6px;
+.search-name {
+  font-size: 10px;
+  color: #8a8a8a;
+  margin-top: 2px;
 }
 </style>
-</head>
