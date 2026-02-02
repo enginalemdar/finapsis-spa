@@ -8,6 +8,24 @@ window.__ABOUT_CACHE = null;
 window.benchmarks = window.benchmarks || [];
 window.companies = window.companies || [];
 
+// Indicator detection utility
+function getIndicatorInfo(ticker) {
+  if (!window.__INDICATORS_MAP) return null;
+  const indKey = String(ticker || '').toLowerCase().trim();
+  const indObj = window.__INDICATORS_MAP[indKey];
+  if (!indObj) return null;
+  
+  return {
+    isIndicator: true,
+    label: indObj.label || ticker,
+    unit: indObj.unit || "",
+    valueType: indObj.value_type || "number",
+    badge: indObj.badge || "",
+    group: indObj.group || ""
+  };
+}
+
+
 let currentTicker = DEFAULT_TICKER;
 
 let apiCompany = null;        
@@ -295,15 +313,18 @@ async function fetchComFinancials(ticker) {
 
 function renderHeaderFromCompanies(ticker){
   const c = findCompanyInList(ticker);
+  const indInfo = getIndicatorInfo(ticker);
 
   let groupName = "BIST";
-  if (c) {
-      groupName = (c.exchange || c.group || "BIST").toUpperCase();
+  if (indInfo) {
+    groupName = indInfo.badge || indInfo.group || "GÖSTERGE";
+  } else if (c) {
+    groupName = (c.exchange || c.group || "BIST").toUpperCase();
   }
   if(groupName === 'SP') groupName = 'US'; 
 
-  const name = c?.name || ticker;
-  const secText = c?.sector_tr || c?.sector || "";
+  const name = indInfo ? indInfo.label : (c?.name || ticker);
+  const secText = indInfo ? "" : (c?.sector_tr || c?.sector || "");
   const sector = secText ? `• ${secText}` : "";
 
   const pillEl = document.getElementById("tickerPill");
@@ -313,10 +334,22 @@ function renderHeaderFromCompanies(ticker){
   if(titleEl) titleEl.innerText = name;
 
   const metaEl = document.getElementById("companyMeta");
-  if(metaEl) metaEl.innerText = c ? `${groupName} ${sector}` : "Veri aranıyor...";
+  if(metaEl) {
+    if (indInfo) {
+      metaEl.innerText = "";
+    } else {
+      metaEl.innerText = c ? `${groupName} ${sector}` : "Veri aranıyor...";
+    }
+  }
 
   const chartTitleEl = document.getElementById("chartTitle");
-  if(chartTitleEl) chartTitleEl.innerText = `${name} Hisse Fiyatı`;
+  if(chartTitleEl) {
+    if (indInfo) {
+      chartTitleEl.innerText = name;
+    } else {
+      chartTitleEl.innerText = `${name} Hisse Fiyatı`;
+    }
+  }
 
   const logoEl = document.getElementById("companyLogo");
   const fbEl = document.getElementById("companyLogoFallback");
@@ -765,18 +798,22 @@ function render52w(){
   document.getElementById("highPrice").innerText = formatPrice(high);
 
   let sym = currencySymbolForTicker(currentTicker);
+  const indInfo = getIndicatorInfo(currentTicker);
 
-  if (window.__INDICATORS_MAP) {
-      const indKey = String(currentTicker).toLowerCase();
-      const indObj = window.__INDICATORS_MAP[indKey];
-      
-      if (indObj) {
-          sym = indObj.unit || "";
-      }
+  if (indInfo) {
+    if (indInfo.valueType === "percentage") {
+      sym = "%";
+    } else {
+      sym = indInfo.unit || "";
+    }
   }
 
   const live = getLivePriceFromGlobal(currentTicker);
-  const shownPrice = (live.cur !== null && live.cur > 0) ? live.cur : current;
+  let shownPrice = (live.cur !== null && live.cur > 0) ? live.cur : current;
+
+  if (indInfo && indInfo.valueType === "percentage") {
+    shownPrice = shownPrice * 100;
+  }
 
   const hp = document.getElementById("headerPrice");
 const hpVal = document.getElementById("headerPriceVal");
@@ -869,15 +906,26 @@ function ensureChart(rangeKey){
   if (!el) return;
 
   if (!pack.points || pack.points.length === 0){
-    el.innerHTML = `<div style="padding:16px; color:#777; font-weight:900;">Fiyat verisi yok.</div>`;
+    el.innerHTML = `<div style="padding:16px; color:#777; font-weight:900;">Veri yok.</div>`;
     requestSendHeight(false);
     return;
   }
 
   const tickAmount = tickAmountForRange(rangeKey);
+  const indInfo = getIndicatorInfo(currentTicker);
+  const seriesName = indInfo ? "Değer" : "Fiyat";
+  const isPercentage = indInfo && indInfo.valueType === "percentage";
+
+  const yFormatter = isPercentage 
+    ? (v) => "%" + (v * 100).toFixed(2)
+    : (v) => Number(v).toFixed(2);
+
+  const tooltipYFormatter = isPercentage
+    ? (v) => "%" + (v * 100).toFixed(2)
+    : (v) => (indInfo && indInfo.unit ? indInfo.unit : "") + Number(v).toFixed(2);
 
   const options = {
-    series: [{ name: "Fiyat", data: pack.points }],
+    series: [{ name: seriesName, data: pack.points }],
     chart: {
       type: "area",
       height: 300,
@@ -910,10 +958,14 @@ function ensureChart(rangeKey){
     yaxis: {
       labels: {
         style: { colors: "#ffffff", fontWeight: 800 },
-        formatter: (v) => Number(v).toFixed(2)
+        formatter: yFormatter
       }
     },
-    tooltip: { theme: "dark", x: { formatter: (val) => fmtISODate(val) } },
+    tooltip: { 
+      theme: "dark", 
+      x: { formatter: (val) => fmtISODate(val) },
+      y: { formatter: tooltipYFormatter }
+    },
     markers: { size: 0 },
     legend: { show: false }
   };
@@ -929,8 +981,8 @@ function ensureChart(rangeKey){
         });
       });
     } else {
-      chartInstance.updateOptions({ xaxis: options.xaxis }, false, true);
-      chartInstance.updateSeries([{ name: "Fiyat", data: pack.points }], true);
+      chartInstance.updateOptions({ xaxis: options.xaxis, yaxis: options.yaxis, tooltip: options.tooltip }, false, true);
+      chartInstance.updateSeries([{ name: seriesName, data: pack.points }], true);
       requestSendHeight(false);
     }
   } catch(e){
@@ -938,6 +990,7 @@ function ensureChart(rangeKey){
     requestSendHeight(true);
   }
 }
+
 
 function scoreMatch(q, c){
   const tq = q.toUpperCase();
