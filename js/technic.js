@@ -1,16 +1,19 @@
-// Initialize on load
+// Initialize
 window.companies = window.companies || [];
 
 // View switcher
-window.switchView = function(view) {
+document.addEventListener('click', function(e) {
+  const badge = e.target.closest('.view-badge');
+  if (!badge) return;
+  
+  const view = badge.getAttribute('data-view');
   if (view === 'temel') {
-    const ticker = document.getElementById('tickerSearch')?.value || 
-                   document.getElementById('ticker')?.value || '';
+    const ticker = document.getElementById('ticker')?.value || '';
     window.location.href = '/detail.html?ticker=' + ticker;
   }
-};
+});
 
-// Search functionality (same as detail)
+// Search functionality
 const searchInput = document.getElementById('tickerSearch');
 const searchDD = document.getElementById('searchDD');
 
@@ -50,11 +53,8 @@ if (searchInput && searchDD) {
     
     const ticker = item.getAttribute('data-ticker');
     searchInput.value = ticker;
+    document.getElementById('ticker').value = ticker;
     searchDD.style.display = 'none';
-    
-    // Update ticker input and reload
-    const tickerInput = document.getElementById('ticker');
-    if (tickerInput) tickerInput.value = ticker;
     
     document.getElementById('runBtn')?.click();
   });
@@ -84,9 +84,6 @@ if (lookbackBtn && lookbackPopup) {
     const value = btn.getAttribute('data-lookback');
     lookbackLabel.textContent = value;
     lookbackPopup.classList.add('hidden');
-    
-    // Trigger reload with new lookback
-    document.getElementById('runBtn')?.click();
   });
 
   document.addEventListener('click', function(e) {
@@ -96,7 +93,7 @@ if (lookbackBtn && lookbackPopup) {
   });
 }
 
-// Ticker menu popup (same as companies)
+// Menu popup
 const tickerMenuBtn = document.getElementById('tickerMenuBtn');
 const tickerMenuPopup = document.getElementById('tickerMenuPopup');
 
@@ -116,12 +113,11 @@ if (tickerMenuBtn && tickerMenuPopup) {
   });
 }
 
-// Get lookback value from UI
+// Get lookback value
 function getCurrentLookback() {
   const label = document.getElementById('lookbackLabel');
   return label ? parseInt(label.textContent) : 400;
 }
-
 
 // =========================
   // CONFIG

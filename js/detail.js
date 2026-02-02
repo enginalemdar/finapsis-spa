@@ -8,23 +8,6 @@ window.__ABOUT_CACHE = null;
 window.benchmarks = window.benchmarks || [];
 window.companies = window.companies || [];
 
-function getIndicatorInfo(ticker) {
-  if (!window.__INDICATORS_MAP) return null;
-  const indKey = String(ticker || '').toLowerCase().trim();
-  const indObj = window.__INDICATORS_MAP[indKey];
-  if (!indObj) return null;
-  
-  return {
-    isIndicator: true,
-    label: indObj.label || ticker,
-    unit: indObj.unit || "",
-    valueType: indObj.value_type || "number",
-    badge: indObj.badge || "",
-    group: indObj.group || ""
-  };
-}
-
-
 let currentTicker = DEFAULT_TICKER;
 
 let apiCompany = null;        
@@ -37,8 +20,6 @@ let derived52w = { low: 0, high: 0, current: 0 };
 let chartInstance = null;
 let chartFull = { points: [] }; 
 let activeRange = "1Y";
-let activeChartType = "area";
-let volumeChartInstance = null;
 
 let loadSeq = 0;
 
@@ -120,7 +101,7 @@ function fmtISODate(ms){
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return `${day}/${m}/${y}`;
 }
 function setYearHeaders(){
   const y = new Date().getFullYear();
@@ -314,18 +295,15 @@ async function fetchComFinancials(ticker) {
 
 function renderHeaderFromCompanies(ticker){
   const c = findCompanyInList(ticker);
-  const indInfo = getIndicatorInfo(ticker);
 
   let groupName = "BIST";
-  if (indInfo) {
-    groupName = indInfo.badge || indInfo.group || "GÖSTERGE";
-  } else if (c) {
-    groupName = (c.exchange || c.group || "BIST").toUpperCase();
+  if (c) {
+      groupName = (c.exchange || c.group || "BIST").toUpperCase();
   }
   if(groupName === 'SP') groupName = 'US'; 
 
-  const name = indInfo ? indInfo.label : (c?.name || ticker);
-  const secText = indInfo ? "" : (c?.sector_tr || c?.sector || "");
+  const name = c?.name || ticker;
+  const secText = c?.sector_tr || c?.sector || "";
   const sector = secText ? `• ${secText}` : "";
 
   const pillEl = document.getElementById("tickerPill");
@@ -335,22 +313,10 @@ function renderHeaderFromCompanies(ticker){
   if(titleEl) titleEl.innerText = name;
 
   const metaEl = document.getElementById("companyMeta");
-  if(metaEl) {
-    if (indInfo) {
-      metaEl.innerText = "";
-    } else {
-      metaEl.innerText = c ? `${groupName} ${sector}` : "Veri aranıyor...";
-    }
-  }
+  if(metaEl) metaEl.innerText = c ? `${groupName} ${sector}` : "Veri aranıyor...";
 
   const chartTitleEl = document.getElementById("chartTitle");
-  if(chartTitleEl) {
-    if (indInfo) {
-      chartTitleEl.innerText = name;
-    } else {
-      chartTitleEl.innerText = `${name} Hisse Fiyatı`;
-    }
-  }
+  if(chartTitleEl) chartTitleEl.innerText = `${name} Hisse Fiyatı`;
 
   const logoEl = document.getElementById("companyLogo");
   const fbEl = document.getElementById("companyLogoFallback");
@@ -669,9 +635,30 @@ function renderNews(){
 
   container.innerHTML = apiNews.map(n => {
     const dateText = n?.ts ? fmtDate(n.ts) : (n?.date || "");
-    const url = String(n?.link || "").trim();
+    let url = String(n?.link || "").trim();
     const isValid = !!url && url !== "#";
+    
+    // Add utm_source parameter
+    if (isValid && url) {
+      try {
+        const urlObj = new URL(url);
+        urlObj.searchParams.set('utm_source', 'finapsis.co');
+        url = urlObj.toString();
+      } catch(e) {}
+    }
+    
     const senti = String(n?.sentiment || "").trim();
+    let sentiBadgeClass = "badge";
+    if (senti) {
+      const s = senti.toLowerCase();
+      if (s.includes('olumlu') || s.includes('positive')) {
+        sentiBadgeClass = "badge positive";
+      } else if (s.includes('olumsuz') || s.includes('negative')) {
+        sentiBadgeClass = "badge negative";
+      } else {
+        sentiBadgeClass = "badge neutral";
+      }
+    }
 
     return `
       <a href="${isValid ? url : "javascript:void(0)"}" class="news-item group" ${isValid ? 'target="_blank" rel="noopener"' : ""}>
@@ -682,7 +669,7 @@ function renderNews(){
         <div class="text-[#ddd] text-xs font-semibold leading-snug group-hover:text-[#c2f50e] transition-colors">
           ${n?.title || "-"}
         </div>
-        ${senti ? `<div class="mt-2"><span class="badge neon">${senti}</span></div>` : ``}
+        ${senti ? `<div class="mt-2"><span class="${sentiBadgeClass}">${senti}</span></div>` : ``}
       </a>
     `;
   }).join("");
@@ -745,22 +732,15 @@ function buildFullChartFromHistory(history){
     .map(p => {
         if (p.t !== undefined && p.c !== undefined) {
             return {
-                x: p.t * 1000,
-                o: Number(p.o || p.c),
-                h: Number(p.h || p.c),
-                l: Number(p.l || p.c),
-                c: Number(p.c),
-                v: Number(p.v || 0)
+                x: p.t * 1000, 
+                y: Number(p.c)
             };
         }
         
         const d = parseMMDDYYYY(p.date);
         const price = safeNum(p.price);
         if (d && price !== null) {
-            return { 
-                x: d.getTime(), 
-                o: price, h: price, l: price, c: price, v: 0 
-            };
+            return { x: d.getTime(), y: price };
         }
         return null;
     })
@@ -775,7 +755,7 @@ function calc52wFromPoints(points){
 
   const lastPoint = points[points.length - 1];
   const lastDate = lastPoint.x; 
-  const current = lastPoint.y;
+  const current = lastPoint.c || lastPoint.y || 0;
 
   const oneYearMs = 365 * 24 * 60 * 60 * 1000;
   const cutOff = lastDate - oneYearMs;
@@ -798,39 +778,29 @@ function calc52wFromPoints(points){
 
 function render52w(){
   const { low, high, current } = derived52w || { low:0, high:0, current:0 };
-  
-  let sym = currencySymbolForTicker(currentTicker);
-  const indInfo = getIndicatorInfo(currentTicker);
-  const isPercentage = indInfo && indInfo.valueType === "percentage";
-
-  if (indInfo) {
-    if (indInfo.valueType === "percentage") {
-      sym = "%";
-    } else {
-      sym = indInfo.unit || "";
-    }
-  }
-
-  const displayCurrent = isPercentage ? current * 100 : current;
-  const displayLow = isPercentage ? low * 100 : low;
-  const displayHigh = isPercentage ? high * 100 : high;
-
-  const denom = (displayHigh - displayLow);
-  let pct = denom > 0 ? ((displayCurrent - displayLow) / denom) * 100 : 0;
+  const denom = (high - low);
+  let pct = denom > 0 ? ((current - low) / denom) * 100 : 0;
   pct = Math.max(0, Math.min(100, pct));
 
   document.getElementById("rangeFill").style.width = pct + "%";
   document.getElementById("rangeThumb").style.left = pct + "%";
-  document.getElementById("currentPriceLabel").innerText = formatPrice(displayCurrent);
-  document.getElementById("lowPrice").innerText = formatPrice(displayLow);
-  document.getElementById("highPrice").innerText = formatPrice(displayHigh);
+  document.getElementById("currentPriceLabel").innerText = formatPrice(current);
+  document.getElementById("lowPrice").innerText = formatPrice(low);
+  document.getElementById("highPrice").innerText = formatPrice(high);
+
+  let sym = currencySymbolForTicker(currentTicker);
+
+  if (window.__INDICATORS_MAP) {
+      const indKey = String(currentTicker).toLowerCase();
+      const indObj = window.__INDICATORS_MAP[indKey];
+      
+      if (indObj) {
+          sym = indObj.unit || "";
+      }
+  }
 
   const live = getLivePriceFromGlobal(currentTicker);
-  let shownPrice = (live.cur !== null && live.cur > 0) ? live.cur : current;
-
-  if (isPercentage) {
-    shownPrice = shownPrice * 100;
-  }
+  const shownPrice = (live.cur !== null && live.cur > 0) ? live.cur : current;
 
   const hp = document.getElementById("headerPrice");
 const hpVal = document.getElementById("headerPriceVal");
@@ -901,33 +871,18 @@ function getRangeSlice(rangeKey){
     return { points: pts.slice(n - take) };
   };
 
-  if (rangeKey === "1H") return last(60);
-  if (rangeKey === "1A") return last(21);
-  if (rangeKey === "3A") return last(63);
-  if (rangeKey === "6A") return last(126);
+  if (rangeKey === "1M") return last(21);
+  if (rangeKey === "3M") return last(63);
+  if (rangeKey === "6M") return last(126);
   if (rangeKey === "1Y") return last(252);
-  if (rangeKey === "5Y") return last(1260);
   
-  if (rangeKey === "YTD") {
-    const now = new Date();
-    const yearStart = new Date(now.getFullYear(), 0, 1).getTime();
-    return { points: pts.filter(p => p.x >= yearStart) };
-  }
-  
-  if (rangeKey === "MAX") return { points: pts };
-  
-  return last(252);
+  return { points: pts };
 }
 
 function tickAmountForRange(rangeKey){
-  if (rangeKey === "1H") return 6;
-  if (rangeKey === "1A") return 5;
-  if (rangeKey === "3A") return 6;
-  if (rangeKey === "6A") return 7;
-  if (rangeKey === "1Y") return 7;
-  if (rangeKey === "YTD") return 7;
-  if (rangeKey === "5Y") return 6;
-  if (rangeKey === "MAX") return 8;
+  if (rangeKey === "1M") return 5;
+  if (rangeKey === "3M") return 6;
+  if (rangeKey === "6M") return 7;
   return 7; 
 }
 
@@ -935,171 +890,78 @@ function ensureChart(rangeKey){
   activeRange = rangeKey;
   const pack = getRangeSlice(rangeKey);
   const el = document.querySelector("#priceChart");
-  const volEl = document.querySelector("#volumeChart");
   if (!el) return;
 
   if (!pack.points || pack.points.length === 0){
-    el.innerHTML = `<div style="padding:16px; color:#777; font-weight:900;">Veri yok.</div>`;
-    if (volEl) volEl.innerHTML = "";
+    el.innerHTML = `<div style="padding:16px; color:#777; font-weight:900;">Fiyat verisi yok.</div>`;
     requestSendHeight(false);
     return;
   }
 
   const tickAmount = tickAmountForRange(rangeKey);
-  const indInfo = getIndicatorInfo(currentTicker);
-  const seriesName = indInfo ? "Değer" : "Fiyat";
-  const isPercentage = indInfo && indInfo.valueType === "percentage";
-
-  const yFormatter = isPercentage 
-    ? (v) => "%" + (v * 100).toFixed(2)
-    : (v) => Number(v).toFixed(2);
-
-  const tooltipYFormatter = isPercentage
-    ? (v) => "%" + (v * 100).toFixed(2)
-    : (v) => (indInfo && indInfo.unit ? indInfo.unit : "") + Number(v).toFixed(2);
-
-  const chartType = activeChartType || "area";
-  let series, chartConfig;
-  
-  if (chartType === "candlestick") {
-    series = [{
-      name: seriesName,
-      data: pack.points.map(p => ({x: p.x, y: [p.o, p.h, p.l, p.c]}))
-    }];
-    
-    chartConfig = {
-      chart: { type: "candlestick", height: 300, fontFamily: "Inter", toolbar: { show: false }, background: "transparent", zoom: { enabled: false } },
-      theme: { mode: "dark" },
-      plotOptions: { candlestick: { colors: { upward: "#c2f50e", downward: "#ff4d4d" }, wick: { useFillColor: true } } }
-    };
-  } else if (chartType === "line") {
-    series = [{
-      name: seriesName,
-      data: pack.points.map(p => ({ x: p.x, y: p.c }))
-    }];
-    
-    chartConfig = {
-      chart: { type: "line", height: 300, fontFamily: "Inter", toolbar: { show: false }, background: "transparent", zoom: { enabled: false }, pan: { enabled: false } },
-      theme: { mode: "dark" },
-      colors: ["#c2f50e"],
-      stroke: { curve: "smooth", width: 2 }
-    };
-  } else {
-    series = [{
-      name: seriesName,
-      data: pack.points.map(p => ({ x: p.x, y: p.c }))
-    }];
-    
-    chartConfig = {
-      chart: { type: "area", height: 300, fontFamily: "Inter", toolbar: { show: false }, background: "transparent", zoom: { enabled: false }, pan: { enabled: false } },
-      theme: { mode: "dark" },
-      colors: ["#c2f50e"],
-      stroke: { curve: "smooth", width: 2 },
-      fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.06, stops: [0, 85, 100] } }
-    };
-  }
 
   const options = {
-    series: series,
-    ...chartConfig,
+    series: [{ name: "Fiyat", data: pack.points }],
+    chart: {
+      type: "area",
+      height: 300,
+      fontFamily: "Inter",
+      toolbar: { show: false },
+      background: "transparent",
+      zoom: { enabled: false },
+      pan: { enabled: false }
+    },
+    theme: { mode: "dark" },
+    colors: ["#c2f50e"],
+    stroke: { curve: "smooth", width: 2 },
+    fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.06, stops: [0, 85, 100] } },
     dataLabels: { enabled: false },
     grid: { borderColor: "rgba(255,255,255,0.06)", strokeDashArray: 4, padding: { left: 10, right: 10 } },
     xaxis: {
-      type: "datetime", tickAmount,
-      labels: { rotate: -45, rotateAlways: true, hideOverlappingLabels: true, showDuplicates: false, style: { colors: "#ffffff", fontWeight: 800 }, formatter: (val) => fmtISODate(val) },
-      axisBorder: { show: false }, axisTicks: { show: false }
+      type: "datetime",
+      tickAmount,
+      labels: {
+        rotate: -45,
+        rotateAlways: true,
+        hideOverlappingLabels: true,
+        showDuplicates: false,
+        style: { colors: "#ffffff", fontWeight: 800 },
+        formatter: (val) => fmtISODate(val)
+      },
+      axisBorder: { show: false },
+      axisTicks: { show: false }
     },
-    yaxis: { labels: { style: { colors: "#ffffff", fontWeight: 800 }, formatter: yFormatter } },
-    tooltip: { theme: "dark", x: { formatter: (val) => fmtISODate(val) }, y: { formatter: tooltipYFormatter } },
+    yaxis: {
+      labels: {
+        style: { colors: "#ffffff", fontWeight: 800 },
+        formatter: (v) => Number(v).toFixed(2)
+      }
+    },
+    tooltip: { theme: "dark", x: { formatter: (val) => fmtISODate(val) } },
     markers: { size: 0 },
     legend: { show: false }
   };
 
   try{
-    if (chartInstance) {
-      chartInstance.destroy();
-      chartInstance = null;
+    if (!chartInstance){
+      el.innerHTML = ""; 
+      chartInstance = new ApexCharts(el, options);
+      requestAnimationFrame(() => {
+        chartInstance.render().then(() => {
+          requestSendHeight(true);
+          setTimeout(() => requestSendHeight(true), 250);
+        });
+      });
+    } else {
+      chartInstance.updateOptions({ xaxis: options.xaxis }, false, true);
+      chartInstance.updateSeries([{ name: "Fiyat", data: pack.points }], true);
+      requestSendHeight(false);
     }
-    el.innerHTML = "";
-    chartInstance = new ApexCharts(el, options);
-    chartInstance.render().then(() => requestSendHeight(true));
   } catch(e){
     el.innerHTML = `<div style="padding:16px; color:#ff8888; font-weight:900;">Chart hatası: ${String(e && e.message ? e.message : e)}</div>`;
     requestSendHeight(true);
   }
-
-  if (volEl) {
-    const hasVolume = pack.points.some(p => p.v && p.v > 0);
-    
-    if (!hasVolume) {
-      volEl.innerHTML = "";
-      if (volumeChartInstance) {
-        volumeChartInstance.destroy();
-        volumeChartInstance = null;
-      }
-      return;
-    }
-
-    const volumeOptions = {
-      series: [{ name: "Volume", data: pack.points.map(p => ({ x: p.x, y: p.v || 0 })) }],
-      chart: { type: "bar", height: 120, fontFamily: "Inter", toolbar: { show: false }, background: "transparent", zoom: { enabled: false } },
-      theme: { mode: "dark" },
-      colors: ["rgba(194, 245, 14, 0.5)"],
-      plotOptions: { bar: { columnWidth: "80%" } },
-      dataLabels: { enabled: false },
-      grid: { borderColor: "rgba(255,255,255,0.06)", padding: { left: 10, right: 10 } },
-      xaxis: { type: "datetime", labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
-      yaxis: {
-        labels: {
-          style: { colors: "#ffffff", fontWeight: 600, fontSize: "10px" },
-          formatter: (v) => {
-            if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
-            if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
-            if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
-            return v.toFixed(0);
-          }
-        }
-      },
-      tooltip: { 
-        theme: "dark", 
-        x: { formatter: (val) => fmtISODate(val) }, 
-        y: { 
-          title: { formatter: () => "Hacim: " },
-          formatter: (v) => v.toLocaleString('tr-TR', {maximumFractionDigits: 0}) 
-        } 
-      }
-    };
-
-    try {
-      if (volumeChartInstance) {
-        volumeChartInstance.destroy();
-        volumeChartInstance = null;
-      }
-      volEl.innerHTML = "";
-      volumeChartInstance = new ApexCharts(volEl, volumeOptions);
-      volumeChartInstance.render();
-    } catch(e) {
-      console.error("Volume chart error:", e);
-    }
-  }
 }
-
-window.setChartType = function(type) {
-  if (type !== "area" && type !== "line" && type !== "candlestick") return;
-  activeChartType = type;
-  
-  const buttons = document.querySelectorAll('.chart-type-btn');
-  buttons.forEach(btn => {
-    if (btn.getAttribute('data-type') === type) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
-  });
-  
-  ensureChart(activeRange);
-};
-
 
 function scoreMatch(q, c){
   const tq = q.toUpperCase();
@@ -1461,8 +1323,6 @@ window.finDetailBootOnce = function(){
 };
 
 window.finDetailLoad = function(ticker){
-  const searchInput = document.getElementById('tickerSearch');
-  if (searchInput) searchInput.value = '';
   try { loadAll(ticker); } catch(e){ console.error('finDetailLoad error', e); }
 };
 window.finDetailRefreshHeaderPrice = function(){
@@ -1515,12 +1375,109 @@ async function fetchLatestTickerNews(ticker){
       return [];
   }
 }
+// Render overview metrics with context-aware labels
+function renderOverviewMetrics(ratios) {
+  if (!ratios || typeof ratios !== 'object') return;
+  
+  const list = document.getElementById("overviewMetricsList");
+  if (!list) return;
 
-// View switcher
-window.switchView = function(view) {
-  if (view === 'teknik') {
-    const currentTicker = window.currentTicker || '';
-    window.location.href = '/teknik.html?ticker=' + currentTicker;
+  const keys = Object.keys(ratios).filter(k => k !== 'date' && k !== 'symbol');
+  if (!keys.length) {
+    list.innerHTML = '<div style="text-align:center; padding:18px; color:#666; font-weight:900;">Metrik yok.</div>';
+    return;
   }
-  // temel is current page, no action needed
-};
+
+  function getMetricBadge(key, val) {
+    if (typeof val !== 'number') return "";
+    
+    const k = key.toLowerCase();
+    
+    // Debt ratios - lower is better
+    if (k.includes('debt') || k.includes('borç') || k.includes('borc')) {
+      if (val < 0.5) return '<span class="metric-badge strong">Düşük Risk</span>';
+      if (val < 1.0) return '<span class="metric-badge neutral">Dengeli</span>';
+      return '<span class="metric-badge weak">Riskli</span>';
+    }
+    
+    // Profitability - higher is better
+    if (k.includes('roe') || k.includes('roa') || k.includes('margin') || k.includes('kar') || k.includes('profit')) {
+      if (val > 15) return '<span class="metric-badge strong">Güçlü</span>';
+      if (val > 5) return '<span class="metric-badge neutral">Orta</span>';
+      return '<span class="metric-badge weak">Zayıf</span>';
+    }
+    
+    // Liquidity - higher is better
+    if (k.includes('current') || k.includes('quick') || k.includes('likidite') || k.includes('liquidity')) {
+      if (val > 2) return '<span class="metric-badge strong">Yüksek</span>';
+      if (val > 1) return '<span class="metric-badge neutral">Yeterli</span>';
+      return '<span class="metric-badge weak">Düşük</span>';
+    }
+    
+    // P/E ratio
+    if (k.includes('p/e') || k.includes('fiyat') || k.includes('price')) {
+      if (val < 15) return '<span class="metric-badge strong">Ucuz</span>';
+      if (val < 25) return '<span class="metric-badge neutral">Makul</span>';
+      return '<span class="metric-badge weak">Pahalı</span>';
+    }
+    
+    // Default
+    if (val > 1) return '<span class="metric-badge strong">Güçlü</span>';
+    return '<span class="metric-badge weak">Zayıf</span>';
+  }
+
+  list.innerHTML = "";
+  for (const k of keys) {
+    const val = ratios[k];
+    if (val === null || val === undefined) continue;
+    
+    const metricDiv = document.createElement("div");
+    metricDiv.className = "overview-metric-item";
+    
+    const label = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const valStr = (typeof val === 'number') ? val.toFixed(2) : String(val);
+    const badge = getMetricBadge(k, val);
+    
+    metricDiv.innerHTML = `
+      <div class="metric-label">${label}</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div class="metric-value">${valStr}</div>
+        ${badge}
+      </div>
+    `;
+    
+    list.appendChild(metricDiv);
+  }
+}
+
+// View badge click handler
+document.addEventListener('click', function(e) {
+  const badge = e.target.closest('.view-badge');
+  if (!badge) return;
+  
+  const view = badge.getAttribute('data-view');
+  if (view === 'teknik') {
+    const ticker = window.currentTicker || '';
+    window.location.href = '/technic.html?ticker=' + ticker;
+  }
+});
+
+// Menu popup handler
+const tickerMenuBtn = document.getElementById('tickerMenuBtn');
+const tickerMenuPopup = document.getElementById('tickerMenuPopup');
+
+if (tickerMenuBtn && tickerMenuPopup) {
+  tickerMenuBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const rect = this.getBoundingClientRect();
+    tickerMenuPopup.style.left = rect.left + 'px';
+    tickerMenuPopup.style.top = (rect.bottom + 5) + 'px';
+    tickerMenuPopup.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!tickerMenuBtn.contains(e.target) && !tickerMenuPopup.contains(e.target)) {
+      tickerMenuPopup.classList.add('hidden');
+    }
+  });
+}
