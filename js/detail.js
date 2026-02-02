@@ -8,7 +8,6 @@ window.__ABOUT_CACHE = null;
 window.benchmarks = window.benchmarks || [];
 window.companies = window.companies || [];
 
-// Indicator detection utility
 function getIndicatorInfo(ticker) {
   if (!window.__INDICATORS_MAP) return null;
   const indKey = String(ticker || '').toLowerCase().trim();
@@ -38,7 +37,7 @@ let derived52w = { low: 0, high: 0, current: 0 };
 let chartInstance = null;
 let chartFull = { points: [] }; 
 let activeRange = "1Y";
-let activeChartType = "area"; // "area" | "line" | "candlestick"
+let activeChartType = "area";
 let volumeChartInstance = null;
 
 let loadSeq = 0;
@@ -787,11 +786,8 @@ function calc52wFromPoints(points){
   for (const p of points){
     if (p.x < cutOff) continue;
 
-    const pLow = p.l || p.c || p.y || 0;
-    const pHigh = p.h || p.c || p.y || 0;
-    
-    if (pLow < low) low = pLow;
-    if (pHigh > high) high = pHigh;
+    if (p.y < low) low = p.y;
+    if (p.y > high) high = p.y;
   }
 
   return { low, high, current };
@@ -799,16 +795,23 @@ function calc52wFromPoints(points){
 
 function render52w(){
   const { low, high, current } = derived52w || { low:0, high:0, current:0 };
-
+  
   let sym = currencySymbolForTicker(currentTicker);
   const indInfo = getIndicatorInfo(currentTicker);
   const isPercentage = indInfo && indInfo.valueType === "percentage";
-  
-  // Calculate percentage position for range slider
+
+  if (indInfo) {
+    if (indInfo.valueType === "percentage") {
+      sym = "%";
+    } else {
+      sym = indInfo.unit || "";
+    }
+  }
+
   const displayCurrent = isPercentage ? current * 100 : current;
   const displayLow = isPercentage ? low * 100 : low;
   const displayHigh = isPercentage ? high * 100 : high;
-  
+
   const denom = (displayHigh - displayLow);
   let pct = denom > 0 ? ((displayCurrent - displayLow) / denom) * 100 : 0;
   pct = Math.max(0, Math.min(100, pct));
@@ -819,18 +822,10 @@ function render52w(){
   document.getElementById("lowPrice").innerText = formatPrice(displayLow);
   document.getElementById("highPrice").innerText = formatPrice(displayHigh);
 
-  if (indInfo) {
-    if (indInfo.valueType === "percentage") {
-      sym = "%";
-    } else {
-      sym = indInfo.unit || "";
-    }
-  }
-
   const live = getLivePriceFromGlobal(currentTicker);
   let shownPrice = (live.cur !== null && live.cur > 0) ? live.cur : current;
 
-  if (indInfo && indInfo.valueType === "percentage") {
+  if (isPercentage) {
     shownPrice = shownPrice * 100;
   }
 
@@ -903,6 +898,7 @@ function getRangeSlice(rangeKey){
     return { points: pts.slice(n - take) };
   };
 
+  if (rangeKey === "1H") return last(60);
   if (rangeKey === "1A") return last(21);
   if (rangeKey === "3A") return last(63);
   if (rangeKey === "6A") return last(126);
@@ -921,6 +917,7 @@ function getRangeSlice(rangeKey){
 }
 
 function tickAmountForRange(rangeKey){
+  if (rangeKey === "1H") return 6;
   if (rangeKey === "1A") return 5;
   if (rangeKey === "3A") return 6;
   if (rangeKey === "6A") return 7;
@@ -959,69 +956,43 @@ function ensureChart(rangeKey){
     : (v) => (indInfo && indInfo.unit ? indInfo.unit : "") + Number(v).toFixed(2);
 
   const chartType = activeChartType || "area";
-  
   let series, chartConfig;
   
   if (chartType === "candlestick") {
     series = [{
       name: seriesName,
-      data: pack.points.map(p => ({
-        x: p.x,
-        y: [p.o, p.h, p.l, p.c]
-      }))
+      data: pack.points.map(p => ({x: p.x, y: [p.o, p.h, p.l, p.c]}))
     }];
     
     chartConfig = {
-      chart: {
-        type: "candlestick",
-        height: 300,
-        fontFamily: "Inter",
-        toolbar: { show: false },
-        background: "transparent",
-        zoom: { enabled: false }
-      },
+      chart: { type: "candlestick", height: 300, fontFamily: "Inter", toolbar: { show: false }, background: "transparent", zoom: { enabled: false } },
       theme: { mode: "dark" },
-      plotOptions: {
-        candlestick: {
-          colors: {
-            upward: "#c2f50e",
-            downward: "#ff4d4d"
-          },
-          wick: {
-            useFillColor: true
-          }
-        }
-      }
+      plotOptions: { candlestick: { colors: { upward: "#c2f50e", downward: "#ff4d4d" }, wick: { useFillColor: true } } }
     };
-  } else {
-    // Area chart (default)
+  } else if (chartType === "line") {
     series = [{
       name: seriesName,
       data: pack.points.map(p => ({ x: p.x, y: p.c }))
     }];
     
     chartConfig = {
-      chart: {
-        type: "area",
-        height: 300,
-        fontFamily: "Inter",
-        toolbar: { show: false },
-        background: "transparent",
-        zoom: { enabled: false },
-        pan: { enabled: false }
-      },
+      chart: { type: "line", height: 300, fontFamily: "Inter", toolbar: { show: false }, background: "transparent", zoom: { enabled: false }, pan: { enabled: false } },
+      theme: { mode: "dark" },
+      colors: ["#c2f50e"],
+      stroke: { curve: "smooth", width: 2 }
+    };
+  } else {
+    series = [{
+      name: seriesName,
+      data: pack.points.map(p => ({ x: p.x, y: p.c }))
+    }];
+    
+    chartConfig = {
+      chart: { type: "area", height: 300, fontFamily: "Inter", toolbar: { show: false }, background: "transparent", zoom: { enabled: false }, pan: { enabled: false } },
       theme: { mode: "dark" },
       colors: ["#c2f50e"],
       stroke: { curve: "smooth", width: 2 },
-      fill: { 
-        type: "gradient", 
-        gradient: { 
-          shadeIntensity: 1, 
-          opacityFrom: 0.45, 
-          opacityTo: 0.06, 
-          stops: [0, 85, 100] 
-        } 
-      }
+      fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.06, stops: [0, 85, 100] } }
     };
   }
 
@@ -1031,46 +1002,24 @@ function ensureChart(rangeKey){
     dataLabels: { enabled: false },
     grid: { borderColor: "rgba(255,255,255,0.06)", strokeDashArray: 4, padding: { left: 10, right: 10 } },
     xaxis: {
-      type: "datetime",
-      tickAmount,
-      labels: {
-        rotate: -45,
-        rotateAlways: true,
-        hideOverlappingLabels: true,
-        showDuplicates: false,
-        style: { colors: "#ffffff", fontWeight: 800 },
-        formatter: (val) => fmtISODate(val)
-      },
-      axisBorder: { show: false },
-      axisTicks: { show: false }
+      type: "datetime", tickAmount,
+      labels: { rotate: -45, rotateAlways: true, hideOverlappingLabels: true, showDuplicates: false, style: { colors: "#ffffff", fontWeight: 800 }, formatter: (val) => fmtISODate(val) },
+      axisBorder: { show: false }, axisTicks: { show: false }
     },
-    yaxis: {
-      labels: {
-        style: { colors: "#ffffff", fontWeight: 800 },
-        formatter: yFormatter
-      }
-    },
-    tooltip: { 
-      theme: "dark", 
-      x: { formatter: (val) => fmtISODate(val) },
-      y: { formatter: tooltipYFormatter }
-    },
+    yaxis: { labels: { style: { colors: "#ffffff", fontWeight: 800 }, formatter: yFormatter } },
+    tooltip: { theme: "dark", x: { formatter: (val) => fmtISODate(val) }, y: { formatter: tooltipYFormatter } },
     markers: { size: 0 },
     legend: { show: false }
   };
 
   try{
-    // Destroy existing chart to prevent UI freeze
     if (chartInstance) {
-      try { chartInstance.destroy(); } catch(e){}
+      chartInstance.destroy();
       chartInstance = null;
     }
-    
     el.innerHTML = "";
     chartInstance = new ApexCharts(el, options);
-    chartInstance.render().then(() => {
-      requestSendHeight(true);
-    });
+    chartInstance.render().then(() => requestSendHeight(true));
   } catch(e){
     el.innerHTML = `<div style="padding:16px; color:#ff8888; font-weight:900;">Chart hatası: ${String(e && e.message ? e.message : e)}</div>`;
     requestSendHeight(true);
@@ -1082,40 +1031,21 @@ function ensureChart(rangeKey){
     if (!hasVolume) {
       volEl.innerHTML = "";
       if (volumeChartInstance) {
-        try { volumeChartInstance.destroy(); } catch(e){}
+        volumeChartInstance.destroy();
         volumeChartInstance = null;
       }
       return;
     }
 
     const volumeOptions = {
-      series: [{
-        name: "Volume",
-        data: pack.points.map(p => ({ x: p.x, y: p.v || 0 }))
-      }],
-      chart: {
-        type: "bar",
-        height: 120,
-        fontFamily: "Inter",
-        toolbar: { show: false },
-        background: "transparent",
-        zoom: { enabled: false }
-      },
+      series: [{ name: "Volume", data: pack.points.map(p => ({ x: p.x, y: p.v || 0 })) }],
+      chart: { type: "bar", height: 120, fontFamily: "Inter", toolbar: { show: false }, background: "transparent", zoom: { enabled: false } },
       theme: { mode: "dark" },
       colors: ["rgba(194, 245, 14, 0.5)"],
-      plotOptions: {
-        bar: {
-          columnWidth: "80%"
-        }
-      },
+      plotOptions: { bar: { columnWidth: "80%" } },
       dataLabels: { enabled: false },
       grid: { borderColor: "rgba(255,255,255,0.06)", padding: { left: 10, right: 10 } },
-      xaxis: {
-        type: "datetime",
-        labels: { show: false },
-        axisBorder: { show: false },
-        axisTicks: { show: false }
-      },
+      xaxis: { type: "datetime", labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
       yaxis: {
         labels: {
           style: { colors: "#ffffff", fontWeight: 600, fontSize: "10px" },
@@ -1127,23 +1057,14 @@ function ensureChart(rangeKey){
           }
         }
       },
-      tooltip: {
-        theme: "dark",
-        x: { formatter: (val) => fmtISODate(val) },
-        y: { 
-          formatter: (v) => {
-            return v.toLocaleString('tr-TR', {maximumFractionDigits: 0});
-          }
-        }
-      }
+      tooltip: { theme: "dark", x: { formatter: (val) => fmtISODate(val) }, y: { formatter: (v) => v.toLocaleString('tr-TR', {maximumFractionDigits: 0}) } }
     };
 
     try {
       if (volumeChartInstance) {
-        try { volumeChartInstance.destroy(); } catch(e){}
+        volumeChartInstance.destroy();
         volumeChartInstance = null;
       }
-      
       volEl.innerHTML = "";
       volumeChartInstance = new ApexCharts(volEl, volumeOptions);
       volumeChartInstance.render();
@@ -1154,7 +1075,7 @@ function ensureChart(rangeKey){
 }
 
 window.setChartType = function(type) {
-  if (type !== "area" && type !== "candlestick") return;
+  if (type !== "area" && type !== "line" && type !== "candlestick") return;
   activeChartType = type;
   
   const buttons = document.querySelectorAll('.chart-type-btn');
