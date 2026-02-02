@@ -799,20 +799,25 @@ function calc52wFromPoints(points){
 
 function render52w(){
   const { low, high, current } = derived52w || { low:0, high:0, current:0 };
-  const denom = (high - low);
-  let pct = denom > 0 ? ((current - low) / denom) * 100 : 0;
-  pct = Math.max(0, Math.min(100, pct));
 
-  document.getElementById("rangeFill").style.width = pct + "%";
-  document.getElementById("rangeThumb").style.left = pct + "%";
-  
   let sym = currencySymbolForTicker(currentTicker);
   const indInfo = getIndicatorInfo(currentTicker);
   const isPercentage = indInfo && indInfo.valueType === "percentage";
   
-  document.getElementById("currentPriceLabel").innerText = isPercentage ? formatPrice(current * 100) : formatPrice(current);
-  document.getElementById("lowPrice").innerText = isPercentage ? formatPrice(low * 100) : formatPrice(low);
-  document.getElementById("highPrice").innerText = isPercentage ? formatPrice(high * 100) : formatPrice(high);
+  // Calculate percentage position for range slider
+  const displayCurrent = isPercentage ? current * 100 : current;
+  const displayLow = isPercentage ? low * 100 : low;
+  const displayHigh = isPercentage ? high * 100 : high;
+  
+  const denom = (displayHigh - displayLow);
+  let pct = denom > 0 ? ((displayCurrent - displayLow) / denom) * 100 : 0;
+  pct = Math.max(0, Math.min(100, pct));
+
+  document.getElementById("rangeFill").style.width = pct + "%";
+  document.getElementById("rangeThumb").style.left = pct + "%";
+  document.getElementById("currentPriceLabel").innerText = formatPrice(displayCurrent);
+  document.getElementById("lowPrice").innerText = formatPrice(displayLow);
+  document.getElementById("highPrice").innerText = formatPrice(displayHigh);
 
   if (indInfo) {
     if (indInfo.valueType === "percentage") {
@@ -898,10 +903,9 @@ function getRangeSlice(rangeKey){
     return { points: pts.slice(n - take) };
   };
 
-  if (rangeKey === "1H") return last(60);
-  if (rangeKey === "1D") return last(1);
-  if (rangeKey === "3D") return last(3);
-  if (rangeKey === "6D") return last(6);
+  if (rangeKey === "1A") return last(21);
+  if (rangeKey === "3A") return last(63);
+  if (rangeKey === "6A") return last(126);
   if (rangeKey === "1Y") return last(252);
   if (rangeKey === "5Y") return last(1260);
   
@@ -917,10 +921,9 @@ function getRangeSlice(rangeKey){
 }
 
 function tickAmountForRange(rangeKey){
-  if (rangeKey === "1H") return 6;
-  if (rangeKey === "1D") return 4;
-  if (rangeKey === "3D") return 3;
-  if (rangeKey === "6D") return 6;
+  if (rangeKey === "1A") return 5;
+  if (rangeKey === "3A") return 6;
+  if (rangeKey === "6A") return 7;
   if (rangeKey === "1Y") return 7;
   if (rangeKey === "YTD") return 7;
   if (rangeKey === "5Y") return 6;
@@ -990,27 +993,6 @@ function ensureChart(rangeKey){
         }
       }
     };
-  } else if (chartType === "line") {
-    // Pure line chart (no fill)
-    series = [{
-      name: seriesName,
-      data: pack.points.map(p => ({ x: p.x, y: p.c }))
-    }];
-    
-    chartConfig = {
-      chart: {
-        type: "line",
-        height: 300,
-        fontFamily: "Inter",
-        toolbar: { show: false },
-        background: "transparent",
-        zoom: { enabled: false },
-        pan: { enabled: false }
-      },
-      theme: { mode: "dark" },
-      colors: ["#c2f50e"],
-      stroke: { curve: "smooth", width: 2 }
-    };
   } else {
     // Area chart (default)
     series = [{
@@ -1078,19 +1060,17 @@ function ensureChart(rangeKey){
   };
 
   try{
-    if (!chartInstance){
-      el.innerHTML = ""; 
-      chartInstance = new ApexCharts(el, options);
-      requestAnimationFrame(() => {
-        chartInstance.render().then(() => {
-          requestSendHeight(true);
-          setTimeout(() => requestSendHeight(true), 250);
-        });
-      });
-    } else {
-      chartInstance.updateOptions(options, false, true);
-      requestSendHeight(false);
+    // Destroy existing chart to prevent UI freeze
+    if (chartInstance) {
+      try { chartInstance.destroy(); } catch(e){}
+      chartInstance = null;
     }
+    
+    el.innerHTML = "";
+    chartInstance = new ApexCharts(el, options);
+    chartInstance.render().then(() => {
+      requestSendHeight(true);
+    });
   } catch(e){
     el.innerHTML = `<div style="padding:16px; color:#ff8888; font-weight:900;">Chart hatası: ${String(e && e.message ? e.message : e)}</div>`;
     requestSendHeight(true);
@@ -1159,15 +1139,14 @@ function ensureChart(rangeKey){
     };
 
     try {
-      if (!volumeChartInstance) {
-        volEl.innerHTML = "";
-        volumeChartInstance = new ApexCharts(volEl, volumeOptions);
-        requestAnimationFrame(() => {
-          volumeChartInstance.render();
-        });
-      } else {
-        volumeChartInstance.updateOptions(volumeOptions, false, true);
+      if (volumeChartInstance) {
+        try { volumeChartInstance.destroy(); } catch(e){}
+        volumeChartInstance = null;
       }
+      
+      volEl.innerHTML = "";
+      volumeChartInstance = new ApexCharts(volEl, volumeOptions);
+      volumeChartInstance.render();
     } catch(e) {
       console.error("Volume chart error:", e);
     }
@@ -1175,7 +1154,7 @@ function ensureChart(rangeKey){
 }
 
 window.setChartType = function(type) {
-  if (type !== "area" && type !== "line" && type !== "candlestick") return;
+  if (type !== "area" && type !== "candlestick") return;
   activeChartType = type;
   
   const buttons = document.querySelectorAll('.chart-type-btn');
