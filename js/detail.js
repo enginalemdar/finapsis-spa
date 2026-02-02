@@ -38,6 +38,8 @@ let derived52w = { low: 0, high: 0, current: 0 };
 let chartInstance = null;
 let chartFull = { points: [] }; 
 let activeRange = "1Y";
+let activeChartType = "area"; // "area" | "line" | "candlestick"
+let volumeChartInstance = null;
 
 let loadSeq = 0;
 
@@ -744,15 +746,22 @@ function buildFullChartFromHistory(history){
     .map(p => {
         if (p.t !== undefined && p.c !== undefined) {
             return {
-                x: p.t * 1000, 
-                y: Number(p.c)
+                x: p.t * 1000,
+                o: Number(p.o || p.c),
+                h: Number(p.h || p.c),
+                l: Number(p.l || p.c),
+                c: Number(p.c),
+                v: Number(p.v || 0)
             };
         }
         
         const d = parseMMDDYYYY(p.date);
         const price = safeNum(p.price);
         if (d && price !== null) {
-            return { x: d.getTime(), y: price };
+            return { 
+                x: d.getTime(), 
+                o: price, h: price, l: price, c: price, v: 0 
+            };
         }
         return null;
     })
@@ -778,8 +787,11 @@ function calc52wFromPoints(points){
   for (const p of points){
     if (p.x < cutOff) continue;
 
-    if (p.y < low) low = p.y;
-    if (p.y > high) high = p.y;
+    const pLow = p.l || p.c || p.y || 0;
+    const pHigh = p.h || p.c || p.y || 0;
+    
+    if (pLow < low) low = pLow;
+    if (pHigh > high) high = pHigh;
   }
 
   return { low, high, current };
@@ -886,18 +898,33 @@ function getRangeSlice(rangeKey){
     return { points: pts.slice(n - take) };
   };
 
-  if (rangeKey === "1M") return last(21);
-  if (rangeKey === "3M") return last(63);
-  if (rangeKey === "6M") return last(126);
+  if (rangeKey === "1H") return last(60);
+  if (rangeKey === "1D") return last(1);
+  if (rangeKey === "3D") return last(3);
+  if (rangeKey === "6D") return last(6);
   if (rangeKey === "1Y") return last(252);
+  if (rangeKey === "5Y") return last(1260);
   
-  return { points: pts };
+  if (rangeKey === "YTD") {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1).getTime();
+    return { points: pts.filter(p => p.x >= yearStart) };
+  }
+  
+  if (rangeKey === "MAX") return { points: pts };
+  
+  return last(252);
 }
 
 function tickAmountForRange(rangeKey){
-  if (rangeKey === "1M") return 5;
-  if (rangeKey === "3M") return 6;
-  if (rangeKey === "6M") return 7;
+  if (rangeKey === "1H") return 6;
+  if (rangeKey === "1D") return 4;
+  if (rangeKey === "3D") return 3;
+  if (rangeKey === "6D") return 6;
+  if (rangeKey === "1Y") return 7;
+  if (rangeKey === "YTD") return 7;
+  if (rangeKey === "5Y") return 6;
+  if (rangeKey === "MAX") return 8;
   return 7; 
 }
 
@@ -905,10 +932,12 @@ function ensureChart(rangeKey){
   activeRange = rangeKey;
   const pack = getRangeSlice(rangeKey);
   const el = document.querySelector("#priceChart");
+  const volEl = document.querySelector("#volumeChart");
   if (!el) return;
 
   if (!pack.points || pack.points.length === 0){
     el.innerHTML = `<div style="padding:16px; color:#777; font-weight:900;">Veri yok.</div>`;
+    if (volEl) volEl.innerHTML = "";
     requestSendHeight(false);
     return;
   }
@@ -926,21 +955,97 @@ function ensureChart(rangeKey){
     ? (v) => "%" + (v * 100).toFixed(2)
     : (v) => (indInfo && indInfo.unit ? indInfo.unit : "") + Number(v).toFixed(2);
 
+  const chartType = activeChartType || "area";
+  
+  let series, chartConfig;
+  
+  if (chartType === "candlestick") {
+    series = [{
+      name: seriesName,
+      data: pack.points.map(p => ({
+        x: p.x,
+        y: [p.o, p.h, p.l, p.c]
+      }))
+    }];
+    
+    chartConfig = {
+      chart: {
+        type: "candlestick",
+        height: 300,
+        fontFamily: "Inter",
+        toolbar: { show: false },
+        background: "transparent",
+        zoom: { enabled: false }
+      },
+      theme: { mode: "dark" },
+      plotOptions: {
+        candlestick: {
+          colors: {
+            upward: "#c2f50e",
+            downward: "#ff4d4d"
+          },
+          wick: {
+            useFillColor: true
+          }
+        }
+      }
+    };
+  } else if (chartType === "line") {
+    // Pure line chart (no fill)
+    series = [{
+      name: seriesName,
+      data: pack.points.map(p => ({ x: p.x, y: p.c }))
+    }];
+    
+    chartConfig = {
+      chart: {
+        type: "line",
+        height: 300,
+        fontFamily: "Inter",
+        toolbar: { show: false },
+        background: "transparent",
+        zoom: { enabled: false },
+        pan: { enabled: false }
+      },
+      theme: { mode: "dark" },
+      colors: ["#c2f50e"],
+      stroke: { curve: "smooth", width: 2 }
+    };
+  } else {
+    // Area chart (default)
+    series = [{
+      name: seriesName,
+      data: pack.points.map(p => ({ x: p.x, y: p.c }))
+    }];
+    
+    chartConfig = {
+      chart: {
+        type: "area",
+        height: 300,
+        fontFamily: "Inter",
+        toolbar: { show: false },
+        background: "transparent",
+        zoom: { enabled: false },
+        pan: { enabled: false }
+      },
+      theme: { mode: "dark" },
+      colors: ["#c2f50e"],
+      stroke: { curve: "smooth", width: 2 },
+      fill: { 
+        type: "gradient", 
+        gradient: { 
+          shadeIntensity: 1, 
+          opacityFrom: 0.45, 
+          opacityTo: 0.06, 
+          stops: [0, 85, 100] 
+        } 
+      }
+    };
+  }
+
   const options = {
-    series: [{ name: seriesName, data: pack.points }],
-    chart: {
-      type: "area",
-      height: 300,
-      fontFamily: "Inter",
-      toolbar: { show: false },
-      background: "transparent",
-      zoom: { enabled: false },
-      pan: { enabled: false }
-    },
-    theme: { mode: "dark" },
-    colors: ["#c2f50e"],
-    stroke: { curve: "smooth", width: 2 },
-    fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.06, stops: [0, 85, 100] } },
+    series: series,
+    ...chartConfig,
     dataLabels: { enabled: false },
     grid: { borderColor: "rgba(255,255,255,0.06)", strokeDashArray: 4, padding: { left: 10, right: 10 } },
     xaxis: {
@@ -983,15 +1088,107 @@ function ensureChart(rangeKey){
         });
       });
     } else {
-      chartInstance.updateOptions({ xaxis: options.xaxis, yaxis: options.yaxis, tooltip: options.tooltip }, false, true);
-      chartInstance.updateSeries([{ name: seriesName, data: pack.points }], true);
+      chartInstance.updateOptions(options, false, true);
       requestSendHeight(false);
     }
   } catch(e){
     el.innerHTML = `<div style="padding:16px; color:#ff8888; font-weight:900;">Chart hatası: ${String(e && e.message ? e.message : e)}</div>`;
     requestSendHeight(true);
   }
+
+  if (volEl) {
+    const hasVolume = pack.points.some(p => p.v && p.v > 0);
+    
+    if (!hasVolume) {
+      volEl.innerHTML = "";
+      if (volumeChartInstance) {
+        try { volumeChartInstance.destroy(); } catch(e){}
+        volumeChartInstance = null;
+      }
+      return;
+    }
+
+    const volumeOptions = {
+      series: [{
+        name: "Volume",
+        data: pack.points.map(p => ({ x: p.x, y: p.v || 0 }))
+      }],
+      chart: {
+        type: "bar",
+        height: 120,
+        fontFamily: "Inter",
+        toolbar: { show: false },
+        background: "transparent",
+        zoom: { enabled: false }
+      },
+      theme: { mode: "dark" },
+      colors: ["rgba(194, 245, 14, 0.5)"],
+      plotOptions: {
+        bar: {
+          columnWidth: "80%"
+        }
+      },
+      dataLabels: { enabled: false },
+      grid: { borderColor: "rgba(255,255,255,0.06)", padding: { left: 10, right: 10 } },
+      xaxis: {
+        type: "datetime",
+        labels: { show: false },
+        axisBorder: { show: false },
+        axisTicks: { show: false }
+      },
+      yaxis: {
+        labels: {
+          style: { colors: "#ffffff", fontWeight: 600, fontSize: "10px" },
+          formatter: (v) => {
+            if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
+            if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+            if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
+            return v.toFixed(0);
+          }
+        }
+      },
+      tooltip: {
+        theme: "dark",
+        x: { formatter: (val) => fmtISODate(val) },
+        y: { 
+          formatter: (v) => {
+            return v.toLocaleString('tr-TR', {maximumFractionDigits: 0});
+          }
+        }
+      }
+    };
+
+    try {
+      if (!volumeChartInstance) {
+        volEl.innerHTML = "";
+        volumeChartInstance = new ApexCharts(volEl, volumeOptions);
+        requestAnimationFrame(() => {
+          volumeChartInstance.render();
+        });
+      } else {
+        volumeChartInstance.updateOptions(volumeOptions, false, true);
+      }
+    } catch(e) {
+      console.error("Volume chart error:", e);
+    }
+  }
 }
+
+window.setChartType = function(type) {
+  if (type !== "area" && type !== "line" && type !== "candlestick") return;
+  activeChartType = type;
+  
+  const buttons = document.querySelectorAll('.chart-type-btn');
+  buttons.forEach(btn => {
+    if (btn.getAttribute('data-type') === type) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  
+  ensureChart(activeRange);
+};
 
 
 function scoreMatch(q, c){
