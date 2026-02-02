@@ -8,25 +8,7 @@
   let BUBBLE_API_TOKEN = String((CFG.BUBBLE_API_TOKEN || window.BUBBLE_API_TOKEN || '')).trim();
 
   // bubble.html → postMessage({ type: "FIN_SESSION", payload: { user_id, email, plan } })
-  window.addEventListener("message", function(ev) {
-    if (!ev.data || ev.data.type !== "FIN_SESSION") return;
-    const p = ev.data.payload || {};
-    const uid = String(p.user_id || "").trim();
-    if (!uid) return;
-    if (uid === BUBBLE_USER_ID) return; // zaten set edilmiş
-
-    BUBBLE_USER_ID = uid;
-    BUBBLE_USER_NAME = String(p.email || p.name || "User").trim();
-    BUBBLE_API_TOKEN = String(p.token || "").trim();
-    console.log("[PF] FIN_SESSION alındı, user_id:", uid);
-
-    // user henüz set edilmemişse (auth ekranında bekleniyorsa) otomatik başlat
-    if (!state.user) {
-      state.user = { id: BUBBLE_USER_ID, name: BUBBLE_USER_NAME };
-      if (BUBBLE_API_TOKEN) state.token = BUBBLE_API_TOKEN;
-      refreshData();
-    }
-  });
+  // (listener aşağıda state tanımlandıktan sonra kurulur)
 
   const API_BASE = String((CFG.API_BASE || 'https://eap-35848.bubbleapps.io/api/1.1/wf')).replace(/\/\s*$/, '');
   const GOOGLE_CLIENT_ID = String((CFG.GOOGLE_CLIENT_ID || '')).trim();
@@ -117,6 +99,26 @@ window.pfRefreshPricesFromProxy = pfRefreshPricesFromProxy;
 
   let charts = {};
 
+  // FIN_SESSION listener — state artık hazır
+  window.addEventListener("message", function(ev) {
+    if (!ev.data || ev.data.type !== "FIN_SESSION") return;
+    const p = ev.data.payload || {};
+    const uid = String(p.user_id || "").trim();
+    if (!uid) return;
+    if (uid === BUBBLE_USER_ID) return;
+
+    BUBBLE_USER_ID = uid;
+    BUBBLE_USER_NAME = String(p.email || p.name || "User").trim();
+    BUBBLE_API_TOKEN = String(p.token || "").trim();
+    console.log("[PF] FIN_SESSION alındı, user_id:", uid);
+
+    if (!state.user) {
+      state.user = { id: BUBBLE_USER_ID, name: BUBBLE_USER_NAME };
+      if (BUBBLE_API_TOKEN) state.token = BUBBLE_API_TOKEN;
+      refreshData();
+    }
+  });
+
   // O(1) ticker lookup — companies yüklenince map'ı build
   let __pfCompMap = null;
   function pfGetCompMap() {
@@ -138,7 +140,7 @@ window.pfRefreshPricesFromProxy = pfRefreshPricesFromProxy;
 
   const isUSD = (ticker) => {
     const item = getItem(ticker);
-    return item && (item.group === 'sp' || item.group === 'nasdaq' || item.group === 'nyse' || item.group === 'emtia' || item.group === 'kripto');
+    return item && (item.group === 'nyse' || item.group === 'nasdaq' || item.group === 'emtia' || item.group === 'kripto');
   };
 
   const getSym = (ticker) => isUSD(ticker) ? '$' : '₺';
@@ -346,7 +348,7 @@ document.addEventListener("visibilitychange", () => {
   return v ? v : "Diğer";
 }
 function pfCanSectorFilter(){
-  return state.activeGroup === "bist" || state.activeGroup === "sp";
+  return state.activeGroup === "bist";
 }
 
 window.pfBuildSectorList = function(){
@@ -1280,7 +1282,7 @@ const getDetailUrl = (ticker) => {
   if(!item) return null;
 
   const slug = (item.slug || ticker || "").toString().toLowerCase();
-  const isCompany = (item.group === "bist" || item.group === "sp" || item.group === "nasdaq" || item.group === "nyse");
+  const isCompany = (item.group === "bist" || item.group === "nasdaq" || item.group === "nyse");
   const root = isCompany ? "https://finapsis.co/comdetail/" : "https://finapsis.co/itemdetail/";
   return root + encodeURIComponent(slug);
 };
