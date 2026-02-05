@@ -80,11 +80,19 @@
           <button class="tab-btn" data-tab="cash-flow-statement" type="button" role="tab" aria-selected="false">Nakit Akış Tablosu</button>
         </div>
 
+        <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
+          <div class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest">Dönem</div>
+          <div class="period-toggle">
+            <button id="periodAnnualBtn" class="period-btn active" type="button">Yıllık</button>
+            <button id="periodQuarterBtn" class="period-btn" type="button">Çeyreklik</button>
+          </div>
+        </div>
+
         <div class="overflow-x-auto" id="financialTableWrap">
           <table class="fin-table" aria-label="Finansal tablo">
             <thead>
-              <tr>
-                <th width="35%">Kalem</th>
+              <tr id="financialsHeadRow">
+                <th width="28%">Kalem</th>
                 <th width="16%" data-col="t">TTM</th>
                 <th width="16%" id="y1Head">-</th>
                 <th width="16%" id="y2Head">-</th>
@@ -187,6 +195,38 @@
   background: rgba(194,245,14,0.12) !important;
   border-color: rgba(194,245,14,0.4) !important;
   color: #c2f50e !important;
+}
+
+.period-toggle {
+  display: inline-flex;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 2px;
+  gap: 2px;
+}
+.period-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #bdbdbd;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.period-btn.active {
+  background: rgba(194,245,14,0.14);
+  color: #c2f50e;
+}
+.fin-table th,
+.fin-table td {
+  white-space: nowrap;
+}
+.fin-table th.period-col {
+  min-width: 96px;
 }
 
 .range-btn {
