@@ -196,7 +196,7 @@ function updateUrlTicker(ticker){
 }
 function getActiveTab(){
   const active = document.querySelector('#financialTabs button.tab-btn.active');
-  return active?.dataset?.tab || "income";
+  return active?.dataset?.tab || "income-statement";
 }
 function groupLabel(g){
   const s = String(g || "").toLowerCase();
@@ -540,7 +540,9 @@ async function renderBenchmarksMetrics() {
     const listEl = document.getElementById("overviewMetricsList") || document.getElementById("metricsList");
     if (!listEl) return;
 
-    const rows = Array.isArray(window.apiMetrics) ? window.apiMetrics : [];
+    const rows = (Array.isArray(window.apiMetrics) && window.apiMetrics.length)
+      ? window.apiMetrics
+      : (Array.isArray(window.apiFinancials) ? window.apiFinancials.filter(r => r.type === "metrics") : []);
     
     const pickMetricVal = (row) => {
         if (!row) return null;
@@ -605,11 +607,17 @@ async function renderBenchmarksMetrics() {
         if (headerMcap) headerMcap.textContent = mcapDisplay;
     }
 
+    const live = getLivePriceFromGlobal(currentTicker);
+    const livePrice = (live.cur !== null && live.cur > 0) ? live.cur : null;
+    const epsVal = findVal(["Hisse Başına Kazanç", "EPS (Diluted)", "EPS (Basic)", "EPS"]);
+    const bookVal = findVal(["Defter Değeri", "Tangible Book Value"]);
+    const marketCapRaw = (shares && livePrice) ? shares * livePrice : null;
+
     const items = [
   { 
     label:"F/K", 
     cat:"Değerleme", 
-    v: pick(["F/K", "Fiyat/Kazanç", "PE Ratio"]), 
+    v: (livePrice !== null && epsVal !== null) ? (livePrice / epsVal) : pick(["F/K", "Fiyat/Kazanç", "PE Ratio"]), 
     fmt:(v)=>v.toFixed(2), 
     badges: { good: "CAZİP", neutral: "UYGUN", bad: "PAHALI" },
     ok:(v)=>v>0 && v<20 
@@ -617,7 +625,7 @@ async function renderBenchmarksMetrics() {
   { 
     label:"PD/DD", 
     cat:"Değerleme", 
-    v: pick(["PD/DD", "Price to Book"]), 
+    v: (marketCapRaw !== null && bookVal !== null) ? (marketCapRaw / bookVal) : pick(["PD/DD", "Price to Book"]), 
     fmt:(v)=>v.toFixed(2), 
     badges: { good: "UYGUN", neutral: "NORMAL", bad: "YÜKSEK" },
     ok:(v)=>v<3 
@@ -769,8 +777,10 @@ const findRow = (type, keys) => rows.find(r => {
 });
 
 
-  const rev = findRow("income-statement", ["revenue", "sales", "ciro", "hasılat", "Satış Gelirleri"]);
-  const prof = findRow("income-statement", ["net income", "net profit", "net", "kar", "Dönem Karı (Zararı)"]);
+  let rev = findRow("income-statement", ["revenue", "sales", "ciro", "hasılat", "Satış Gelirleri"]);
+  let prof = findRow("income-statement", ["net income", "net profit", "net", "kar", "Dönem Karı (Zararı)"]);
+  if (!rev) rev = findRow("income", ["revenue", "sales", "ciro", "hasılat", "Satış Gelirleri"]);
+  if (!prof) prof = findRow("income", ["net income", "net profit", "net", "kar", "Dönem Karı (Zararı)"]);
 
   if (!rev || !prof){
     wrap.innerHTML = `<div style="text-align:center; padding:18px; color:#666; font-weight:900; width:100%;">Gelir/Kâr verisi bulunamadı.</div>`;
@@ -872,10 +882,18 @@ if (tabName === "ratios") {
   return;
 }
 
-
-  const rows = (Array.isArray(apiFinancials) ? apiFinancials : [])
-  .filter(i => i.type === tabName)
-  .map((r, idx) => ({ ...r, __idx: idx })); 
+  const allRows = (Array.isArray(apiFinancials) ? apiFinancials : []);
+  let rows = allRows.filter(i => i.type === tabName);
+  if (!rows.length) {
+    const fallbackMap = {
+      "income-statement": "income",
+      "balance-sheet": "balance",
+      "cash-flow-statement": "cash-flow"
+    };
+    const fb = fallbackMap[tabName];
+    if (fb) rows = allRows.filter(i => i.type === fb);
+  }
+  rows = rows.map((r, idx) => ({ ...r, __idx: idx })); 
 
 const sorted = rows.slice().sort((a, b) => {
   const ao = Number(a?.order_no ?? a?.orderNo ?? a?.orderno);
@@ -900,15 +918,26 @@ const sorted = rows.slice().sort((a, b) => {
   }
 
   const pickAnnual = (r, key) => {
-    if (r && r.annual && r.annual[key] !== undefined) return r.annual[key];
-    if (r && r[key] !== undefined) return r[key];
+    if (!r) return null;
+    if (r.annual && r.annual[key] !== undefined) return r.annual[key];
+    if (r[key] !== undefined) return r[key];
     return null;
+  };
+
+  const pickAnnualFallback = (r, key) => {
+    const v = pickAnnual(r, key);
+    if (v !== null && v !== undefined) return v;
+    if (key === "t") {
+      const fb = pickAnnual(r, "tminus1");
+      if (fb !== null && fb !== undefined) return fb;
+    }
+    return v;
   };
 
   tbody.innerHTML = sorted.map(r => `
     <tr>
       <td>${r.item || "-"}</td>
-      <td style="color:#c2f50e; font-weight:900">${formatFinancial(pickAnnual(r, "t"), r.value_type)}</td>
+      <td style="color:#c2f50e; font-weight:900">${formatFinancial(pickAnnualFallback(r, "t"), r.value_type)}</td>
       <td>${formatFinancial(pickAnnual(r, "tminus1"), r.value_type)}</td>
       <td>${formatFinancial(pickAnnual(r, "tminus2"), r.value_type)}</td>
       <td>${formatFinancial(pickAnnual(r, "tminus3"), r.value_type)}</td>
@@ -954,7 +983,7 @@ function calc52wFromPoints(points){
 
   const lastPoint = points[points.length - 1];
   const lastDate = lastPoint.x; 
-  const current = lastPoint.y;
+  const current = (lastPoint.y !== undefined ? lastPoint.y : lastPoint.c);
 
   const oneYearMs = 365 * 24 * 60 * 60 * 1000;
   const cutOff = lastDate - oneYearMs;
@@ -965,8 +994,9 @@ function calc52wFromPoints(points){
   for (const p of points){
     if (p.x < cutOff) continue;
 
-    if (p.y < low) low = p.y;
-    if (p.y > high) high = p.y;
+    const val = (p.y !== undefined ? p.y : p.c);
+    if (val < low) low = val;
+    if (val > high) high = val;
   }
 
   return { low, high, current };
