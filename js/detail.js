@@ -1186,9 +1186,14 @@ const sorted = rows.slice().sort((a, b) => {
         ? pickQuarter(r, k)
         : (k === "t" ? pickAnnualFallback(r, k) : pickAnnual(r, k));
 
+      const vNum = safeNum(raw);
       if (isEffTax) {
-        const v = safeNum(raw);
-        return `<td>${v === null ? "-" : (v * 100).toFixed(2) + "%"}</td>`;
+        return `<td>${vNum === null ? "-" : (vNum * 100).toFixed(2) + "%"}</td>`;
+      }
+
+      if (String(r.value_type || "").toLowerCase() === "percentage") {
+        const cls = vNum > 0 ? "val-up" : (vNum < 0 ? "val-down" : "");
+        return `<td class="${cls}">${vNum === null ? "-" : (vNum * 100).toFixed(2) + "%"}</td>`;
       }
 
       return `<td>${formatFinancial(raw, r.value_type)}</td>`;
