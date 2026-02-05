@@ -73,18 +73,20 @@
         <div id="volumeChart" class="-ml-2" style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;"></div>
       </div>
 
-      <div class="fin-card flex flex-col" id="cardFinancials"> <div class="card-head tab-scroll" id="financialTabs" role="tablist" aria-label="Finansal tablolar">
-          <button class="tab-btn active" data-tab="ratios" type="button" role="tab" aria-selected="true">Genel Bakış</button>
-          <button class="tab-btn" data-tab="income-statement" type="button" role="tab" aria-selected="false">Gelir Tablosu</button>
-          <button class="tab-btn" data-tab="balance-sheet" type="button" role="tab" aria-selected="false">Bilanço</button>
-          <button class="tab-btn" data-tab="cash-flow-statement" type="button" role="tab" aria-selected="false">Nakit Akış Tablosu</button>
-        </div>
-
-        <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
-          <div class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest">Dönem</div>
-          <div class="period-toggle">
-            <button id="periodAnnualBtn" class="period-btn active" type="button">Yıllık</button>
-            <button id="periodQuarterBtn" class="period-btn" type="button">Çeyreklik</button>
+      <div class="fin-card flex flex-col" id="cardFinancials"> 
+        <div class="card-head tab-scroll" id="financialTabs" role="tablist" aria-label="Finansal tablolar">
+          <div class="tabs-left">
+            <button class="tab-btn active" data-tab="ratios" type="button" role="tab" aria-selected="true">Genel Bakış</button>
+            <button class="tab-btn" data-tab="income-statement" type="button" role="tab" aria-selected="false">Gelir Tablosu</button>
+            <button class="tab-btn" data-tab="balance-sheet" type="button" role="tab" aria-selected="false">Bilanço</button>
+            <button class="tab-btn" data-tab="cash-flow-statement" type="button" role="tab" aria-selected="false">Nakit Akış Tablosu</button>
+            <button class="tab-btn" data-tab="metrics" type="button" role="tab" aria-selected="false">Detaylı Metrikler</button>
+          </div>
+          <div class="tabs-right">
+            <div class="period-toggle">
+              <button id="periodAnnualBtn" class="period-btn active" type="button">Yıllık</button>
+              <button id="periodQuarterBtn" class="period-btn" type="button">Çeyreklik</button>
+            </div>
           </div>
         </div>
 
@@ -165,7 +167,7 @@
         </div>
       </div>
 
-      <div class="fin-card flex flex-col">
+      <div class="fin-card flex flex-col" id="sideStack">
         <div class="card-head">
           <h3 class="text-[#c2f50e] font-black text-xs uppercase tracking-widest">İlgili Haberler</h3>
           <div class="news-filters">
@@ -182,6 +184,29 @@
           <button id="newsPrevBtn" class="news-page-btn">Önceki</button>
           <span id="newsPageInfo" class="news-page-info">1 / 1</span>
           <button id="newsNextBtn" class="news-page-btn">Sonraki</button>
+        </div>
+        <div class="fin-card p-5" id="similarCard">
+          <div class="flex justify-between items-center mb-4">
+            <span class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest">Benzer Şirketler</span>
+          </div>
+          <div class="text-xs text-[#6b6b6b] font-semibold mb-3" id="similarSubtitle">-</div>
+          <div class="overflow-x-auto">
+            <table class="fin-table" aria-label="Benzer şirketler">
+              <thead>
+                <tr>
+                  <th width="28%">Şirket</th>
+                  <th>Market Cap</th>
+                  <th>Revenue</th>
+                  <th>Faaliyet Kar Marjı</th>
+                  <th>F/K</th>
+                  <th>PD/DD</th>
+                </tr>
+              </thead>
+              <tbody id="similarBody">
+                <tr><td colspan="6" style="text-align:center; padding:18px; color:#666; font-weight:900;">Benzerler yükleniyor...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -200,29 +225,6 @@
   </div>
 </div>
 
-<div class="fin-card p-5" id="similarCard">
-  <div class="flex justify-between items-center mb-4">
-    <span class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest">Benzer Şirketler</span>
-  </div>
-  <div class="text-xs text-[#6b6b6b] font-semibold mb-3" id="similarSubtitle">-</div>
-  <div class="overflow-x-auto">
-    <table class="fin-table" aria-label="Benzer şirketler">
-      <thead>
-        <tr>
-          <th width="28%">Şirket</th>
-          <th>Market Cap</th>
-          <th>Revenue</th>
-          <th>Faaliyet Kar Marjı</th>
-          <th>F/K</th>
-          <th>PD/DD</th>
-        </tr>
-      </thead>
-      <tbody id="similarBody">
-        <tr><td colspan="6" style="text-align:center; padding:18px; color:#666; font-weight:900;">Benzerler yükleniyor...</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
 
 <style>
 .chart-type-btn {
@@ -241,6 +243,23 @@
   background: rgba(194,245,14,0.12) !important;
   border-color: rgba(194,245,14,0.4) !important;
   color: #c2f50e !important;
+}
+
+#financialTabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tabs-left {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tabs-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
 }
 
 .news-filters {
@@ -364,6 +383,9 @@
 }
 .fin-table th.period-col {
   min-width: 96px;
+}
+.fin-row {
+  cursor: pointer;
 }
 
 .range-btn {
