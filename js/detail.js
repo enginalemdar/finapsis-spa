@@ -33,6 +33,7 @@ let apiNews = [];
 let apiFinancials = [];       
 let apiMetrics = [];
 let apiMeta = { lastTQ: null, lastTA: null };
+let financialPeriodMode = "annual"; // annual | quarterly
 
 let derived52w = { low: 0, high: 0, current: 0 };
 
@@ -172,6 +173,103 @@ function setPeriodHeaders(meta){
   if (th1) th1.innerText = h1;
   if (th2) th2.innerText = h2;
   if (th3) th3.innerText = h3;
+}
+
+function normalizeKey(s){
+  return String(s || "")
+    .toLowerCase()
+    .replace(/ı/g,"i").replace(/ğ/g,"g").replace(/ü/g,"u").replace(/ş/g,"s").replace(/ö/g,"o").replace(/ç/g,"c")
+    .trim();
+}
+
+function getQuarterLabelFromPeriod(periodStr){
+  if (!periodStr || !periodStr.includes("/")) return periodStr || "-";
+  const [y, m] = periodStr.split("/").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return periodStr;
+  let q = 1;
+  if (m <= 3) q = 1;
+  else if (m <= 6) q = 2;
+  else if (m <= 9) q = 3;
+  else q = 4;
+  return `Q${q} ${y}`;
+}
+
+function shiftPeriod(periodStr, shiftQuarters){
+  if (!periodStr || !periodStr.includes("/")) return null;
+  let [y, m] = periodStr.split("/").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return null;
+  let months = m - (shiftQuarters * 3);
+  let year = y;
+  while (months <= 0){
+    months += 12;
+    year -= 1;
+  }
+  return `${year}/${months}`;
+}
+
+function getQuarterColumns(){
+  const rows = Array.isArray(apiFinancials) ? apiFinancials : [];
+  const row = rows.find(r => r && r.quarterly);
+  const keys = row ? Object.keys(row.quarterly || {}) : [];
+  const sorted = keys.sort((a,b)=>{
+    if (a === "t") return -1;
+    if (b === "t") return 1;
+    const na = Number(String(a).replace("tminus",""));
+    const nb = Number(String(b).replace("tminus",""));
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+    return a.localeCompare(b);
+  });
+  return sorted;
+}
+
+function getAnnualColumns(){
+  const rows = Array.isArray(apiFinancials) ? apiFinancials : [];
+  const row = rows.find(r => r && r.annual);
+  const keys = row ? Object.keys(row.annual || {}) : [];
+  const sorted = keys.sort((a,b)=>{
+    if (a === "t") return -1;
+    if (b === "t") return 1;
+    const na = Number(String(a).replace("tminus",""));
+    const nb = Number(String(b).replace("tminus",""));
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+    return a.localeCompare(b);
+  });
+  return sorted;
+}
+
+function getAnnualHeaderLabel(idx){
+  const lastTA = apiMeta?.lastTA;
+  const lastTQ = apiMeta?.lastTQ;
+  let baseYear = null;
+  let head0 = "TTM";
+
+  if (typeof lastTA === "string" && lastTA.toUpperCase() === "TTM") {
+    if (typeof lastTQ === "string" && lastTQ.includes("/")) {
+      const y = Number(lastTQ.split("/")[0]);
+      if (Number.isFinite(y)) baseYear = y;
+    }
+    head0 = "TTM";
+  } else if (lastTA !== null && lastTA !== undefined && String(lastTA).trim() !== "") {
+    const y = Number(String(lastTA).replace(/[^0-9]/g, ""));
+    if (Number.isFinite(y) && y > 1900) {
+      baseYear = y;
+      head0 = String(y);
+    }
+  }
+
+  if (!Number.isFinite(baseYear)) {
+    const y = new Date().getFullYear();
+    baseYear = y - 1;
+  }
+
+  if (idx === 0) return head0;
+  return String(baseYear - idx);
+}
+
+function getQuarterHeaderLabel(idx){
+  const base = apiMeta?.lastTQ;
+  const period = shiftPeriod(base, idx);
+  return getQuarterLabelFromPeriod(period || base || "-");
 }
 function setLoadingState(isLoading){
   const btn = document.getElementById("searchBtn");
@@ -920,7 +1018,25 @@ if (tabName === "ratios") {
     const fb = fallbackMap[tabName];
     if (fb) rows = allRows.filter(i => i.type === fb);
   }
-  rows = rows.map((r, idx) => ({ ...r, __idx: idx })); 
+  const dropItems = new Set([
+    "gross margin",
+    "operating margin",
+    "profit margin",
+    "free cash flow margin",
+    "ebitda margin",
+    "ebit margin",
+    "effective tax rate",
+    "dividend per share",
+    "free cash flow per share",
+    "shares outstanding (basic)",
+    "shares outstanding (diluted)",
+    "eps (basic)",
+    "eps (diluted)"
+  ]);
+
+  rows = rows
+    .filter(r => !dropItems.has(normalizeKey(r.item)))
+    .map((r, idx) => ({ ...r, __idx: idx })); 
 
 const sorted = rows.slice().sort((a, b) => {
   const ao = Number(a?.order_no ?? a?.orderNo ?? a?.orderno);
@@ -939,7 +1055,7 @@ const sorted = rows.slice().sort((a, b) => {
 
 
   if (!rows.length){
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:18px; color:#666; font-weight:900;">Veri yok.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:18px; color:#666; font-weight:900;">Veri yok.</td></tr>`;
     requestSendHeight(false);
     return;
   }
@@ -962,16 +1078,41 @@ const sorted = rows.slice().sort((a, b) => {
     }
     return v;
   };
+  const pickQuarter = (r, key) => {
+    if (!r) return null;
+    if (r.quarterly && r.quarterly[key] !== undefined) return r.quarterly[key];
+    if (r[key] !== undefined) return r[key];
+    return null;
+  };
 
-  tbody.innerHTML = sorted.map(r => `
-    <tr>
-      <td>${r.item || "-"}</td>
-      <td style="color:#c2f50e; font-weight:900">${formatFinancial(pickAnnualFallback(r, "t"), r.value_type)}</td>
-      <td>${formatFinancial(pickAnnual(r, "tminus1"), r.value_type)}</td>
-      <td>${formatFinancial(pickAnnual(r, "tminus2"), r.value_type)}</td>
-      <td>${formatFinancial(pickAnnual(r, "tminus3"), r.value_type)}</td>
-    </tr>
-  `).join("");
+  const columns = (financialPeriodMode === "quarterly") ? getQuarterColumns() : getAnnualColumns();
+  const headerRow = document.getElementById("financialsHeadRow");
+  if (headerRow) {
+    const headerCells = columns.map((k, idx) => {
+      const label = (financialPeriodMode === "quarterly") ? getQuarterHeaderLabel(idx) : getAnnualHeaderLabel(idx);
+      return `<th class="period-col">${label}</th>`;
+    }).join("");
+    headerRow.innerHTML = `<th width="28%">Kalem</th>${headerCells}`;
+  }
+
+  tbody.innerHTML = sorted.map(r => {
+    const normItem = normalizeKey(r.item);
+    const isEffTax = normItem === "effective tax rate";
+    const cells = columns.map(k => {
+      const raw = (financialPeriodMode === "quarterly")
+        ? pickQuarter(r, k)
+        : (k === "t" ? pickAnnualFallback(r, k) : pickAnnual(r, k));
+
+      if (isEffTax) {
+        const v = safeNum(raw);
+        return `<td>${v === null ? "-" : (v * 100).toFixed(2) + "%"}</td>`;
+      }
+
+      return `<td>${formatFinancial(raw, r.value_type)}</td>`;
+    }).join("");
+
+    return `<tr><td>${r.item || "-"}</td>${cells}</tr>`;
+  }).join("");
 
   requestSendHeight(false);
 }
@@ -1561,6 +1702,29 @@ requestSendHeight(false);
   });
 }
 
+function initPeriodToggle(){
+  const annualBtn = document.getElementById("periodAnnualBtn");
+  const quarterBtn = document.getElementById("periodQuarterBtn");
+  if (!annualBtn || !quarterBtn) return;
+
+  const setMode = (mode) => {
+    financialPeriodMode = mode;
+    annualBtn.classList.toggle("active", mode === "annual");
+    quarterBtn.classList.toggle("active", mode === "quarterly");
+    renderFinancialTable(getActiveTab());
+    requestSendHeight(false);
+  };
+
+  if (!annualBtn.__bound) {
+    annualBtn.__bound = true;
+    annualBtn.addEventListener("click", () => setMode("annual"));
+  }
+  if (!quarterBtn.__bound) {
+    quarterBtn.__bound = true;
+    quarterBtn.addEventListener("click", () => setMode("quarterly"));
+  }
+}
+
 function initRanges(){
   const rangeWrap = document.getElementById("rangeBtns");
   if (!rangeWrap) return;
@@ -1635,6 +1799,7 @@ if (!window.ApexCharts){
   initRanges();
   initSearch();
   lockChartWheel();
+  initPeriodToggle();
 
   const urlTicker = getTickerFromQuery();
   document.getElementById("tickerSearch").value = urlTicker;
