@@ -31,6 +31,8 @@ let apiCompany = null;
 let apiPriceHistory = [];     
 let apiNews = [];             
 let apiFinancials = [];       
+let apiMetrics = [];
+let apiMeta = { lastTQ: null, lastTA: null };
 
 let derived52w = { low: 0, high: 0, current: 0 };
 
@@ -127,6 +129,49 @@ function setYearHeaders(){
   document.getElementById("y1Head").innerText = y - 1;
   document.getElementById("y2Head").innerText = y - 2;
   document.getElementById("y3Head").innerText = y - 3;
+}
+
+function setPeriodHeaders(meta){
+  const lastTA = meta?.lastTA;
+  const lastTQ = meta?.lastTQ;
+
+  let head0 = "TTM";
+  let baseYear = null;
+
+  if (typeof lastTA === "string" && lastTA.toUpperCase() === "TTM") {
+    if (typeof lastTQ === "string" && lastTQ.includes("/")) {
+      const y = Number(lastTQ.split("/")[0]);
+      if (Number.isFinite(y)) baseYear = y;
+    }
+  } else if (lastTA !== null && lastTA !== undefined && String(lastTA).trim() !== "") {
+    const y = Number(String(lastTA).replace(/[^0-9]/g, ""));
+    if (Number.isFinite(y) && y > 1900) {
+      baseYear = y;
+      head0 = String(y);
+    }
+  }
+
+  if (lastTA && String(lastTA).toUpperCase() === "TTM") head0 = "TTM";
+
+  if (!Number.isFinite(baseYear)) {
+    const y = new Date().getFullYear();
+    baseYear = y - 1;
+    head0 = "TTM";
+  }
+
+  const h1 = baseYear - 1;
+  const h2 = baseYear - 2;
+  const h3 = baseYear - 3;
+
+  const th0 = document.querySelector('th[data-col="t"]') || document.querySelector('th:nth-child(2)');
+  const th1 = document.getElementById("y1Head");
+  const th2 = document.getElementById("y2Head");
+  const th3 = document.getElementById("y3Head");
+
+  if (th0) th0.innerText = head0;
+  if (th1) th1.innerText = h1;
+  if (th2) th2.innerText = h2;
+  if (th3) th3.innerText = h3;
 }
 function setLoadingState(isLoading){
   const btn = document.getElementById("searchBtn");
@@ -293,23 +338,33 @@ async function fetchComFinancials(ticker) {
             const json = await res.json();
 
             if (Array.isArray(json) && json.length > 0 && json[0].financials) {
-                return { financials: json[0].financials };
+                return { 
+                  financials: json[0].financials || [], 
+                  metrics: json[0].metrics || [],
+                  lastTQ: json[0].lastTQ,
+                  lastTA: json[0].lastTA
+                };
             }
 
             if (json.financials && Array.isArray(json.financials)) {
-                return { financials: json.financials };
+                return { 
+                  financials: json.financials, 
+                  metrics: json.metrics || [],
+                  lastTQ: json.lastTQ,
+                  lastTA: json.lastTA
+                };
             }
 
             if (Array.isArray(json)) {
-                return { financials: json };
+                return { financials: json, metrics: [], lastTQ: null, lastTA: null };
             }
 
-            return { financials: [] };
+            return { financials: [], metrics: [], lastTQ: null, lastTA: null };
         }
     } catch (e) { 
         console.warn("Financials fetch failed", e); 
     }
-    return { financials: [] };
+    return { financials: [], metrics: [], lastTQ: null, lastTA: null };
 }
 
 function renderHeaderFromCompanies(ticker){
@@ -485,15 +540,24 @@ async function renderBenchmarksMetrics() {
     const listEl = document.getElementById("overviewMetricsList") || document.getElementById("metricsList");
     if (!listEl) return;
 
-    const rows = Array.isArray(window.apiFinancials) ? window.apiFinancials : [];
+    const rows = Array.isArray(window.apiMetrics) ? window.apiMetrics : [];
     
+    const pickMetricVal = (row) => {
+        if (!row) return null;
+        if (row.annual && row.annual.t !== undefined) return row.annual.t;
+        if (row.quarterly && row.quarterly.t !== undefined) return row.quarterly.t;
+        if (row.ttm !== undefined) return row.ttm;
+        if (row.value !== undefined) return row.value;
+        return null;
+    };
+
     const findVal = (keys) => {
         const keyList = Array.isArray(keys) ? keys : [keys];
         const hit = rows.find(r => 
             keyList.some(k => String(r.item || "").toLowerCase().replace(/ı/g,'i') === k.toLowerCase().replace(/ı/g,'i'))
         );
         if (!hit) return null;
-        const val = hit.ttm !== undefined ? hit.ttm : hit.value;
+        const val = pickMetricVal(hit);
         return safeNum(val);
     };
 
@@ -502,7 +566,7 @@ async function renderBenchmarksMetrics() {
 
     let mcapDisplay = "-";
     
-    const shareKeys = ["Total Common Shares Outstanding", "Hisse Adedi", "Shares Outstanding (Basic)"];
+    const shareKeys = ["Hisse Adedi", "Shares Outstanding (Diluted)", "Shares Outstanding (Basic)", "Total Common Shares Outstanding"];
     const shares = findVal(shareKeys);
     
     const { current } = derived52w || { current: 0 };
@@ -705,19 +769,19 @@ const findRow = (type, keys) => rows.find(r => {
 });
 
 
-  const rev = findRow("income", ["revenue", "sales", "ciro", "hasılat", "Satış Gelirleri"]);
-  const prof = findRow("income", ["net income", "net profit", "net", "kar", "Dönem Karı (Zararı)"]);
+  const rev = findRow("income-statement", ["revenue", "sales", "ciro", "hasılat", "Satış Gelirleri"]);
+  const prof = findRow("income-statement", ["net income", "net profit", "net", "kar", "Dönem Karı (Zararı)"]);
 
   if (!rev || !prof){
     wrap.innerHTML = `<div style="text-align:center; padding:18px; color:#666; font-weight:900; width:100%;">Gelir/Kâr verisi bulunamadı.</div>`;
     return;
   }
 
-  const keys = ["tminus3","tminus2","tminus1","ttm"];
-  const labels = ["D-3","D-2","D-1","TTM"];
+  const keys = ["tminus3","tminus2","tminus1","t"];
+  const labels = ["D-3","D-2","D-1","D-0"];
 
-  const revVals = keys.map(k => Number(rev[k]));
-  const profVals = keys.map(k => Number(prof[k]));
+  const revVals = keys.map(k => Number(rev?.quarterly?.[k]));
+  const profVals = keys.map(k => Number(prof?.quarterly?.[k]));
 
   const maxRev = Math.max(...revVals.map(v => Number.isFinite(v) ? Math.abs(v) : 0), 1);
   const maxProf = Math.max(...profVals.map(v => Number.isFinite(v) ? Math.abs(v) : 0), 1);
@@ -835,13 +899,19 @@ const sorted = rows.slice().sort((a, b) => {
     return;
   }
 
+  const pickAnnual = (r, key) => {
+    if (r && r.annual && r.annual[key] !== undefined) return r.annual[key];
+    if (r && r[key] !== undefined) return r[key];
+    return null;
+  };
+
   tbody.innerHTML = sorted.map(r => `
     <tr>
       <td>${r.item || "-"}</td>
-      <td style="color:#c2f50e; font-weight:900">${formatFinancial(r.ttm, r.value_type)}</td>
-      <td>${formatFinancial(r.tminus1, r.value_type)}</td>
-      <td>${formatFinancial(r.tminus2, r.value_type)}</td>
-      <td>${formatFinancial(r.tminus3, r.value_type)}</td>
+      <td style="color:#c2f50e; font-weight:900">${formatFinancial(pickAnnual(r, "t"), r.value_type)}</td>
+      <td>${formatFinancial(pickAnnual(r, "tminus1"), r.value_type)}</td>
+      <td>${formatFinancial(pickAnnual(r, "tminus2"), r.value_type)}</td>
+      <td>${formatFinancial(pickAnnual(r, "tminus3"), r.value_type)}</td>
     </tr>
   `).join("");
 
@@ -1362,7 +1432,13 @@ try {
   if (mySeq !== loadSeq) return;
 
   apiFinancials = (res && res.financials) ? res.financials : [];
+  apiMetrics = (res && res.metrics) ? res.metrics : [];
+  apiMeta = { lastTQ: res?.lastTQ || null, lastTA: res?.lastTA || null };
   window.apiFinancials = apiFinancials;
+  window.apiMetrics = apiMetrics;
+  window.apiMeta = apiMeta;
+
+  setPeriodHeaders(apiMeta);
 
   renderFinancialTable(getActiveTab());
   
