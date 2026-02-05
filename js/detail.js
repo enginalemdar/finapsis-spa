@@ -34,6 +34,10 @@ let apiFinancials = [];
 let apiMetrics = [];
 let apiMeta = { lastTQ: null, lastTA: null };
 let financialPeriodMode = "annual"; // annual | quarterly
+let newsFilterMode = "all";
+let newsPage = 1;
+let newsPageSize = 6;
+let trendChartInstance = null;
 
 let derived52w = { low: 0, high: 0, current: 0 };
 
@@ -947,7 +951,29 @@ function renderNews(){
   const container = document.getElementById("newsList");
   if (!container) return;
 
-  if (!Array.isArray(apiNews) || !apiNews.length){
+  const rawList = Array.isArray(apiNews) ? apiNews : [];
+  const filtered = rawList.filter(n => {
+    if (newsFilterMode === "all") return true;
+    const s = String(n?.sentiment || "").toLowerCase();
+    if (newsFilterMode === "positive") return s.includes("olumlu") || s.includes("positive");
+    if (newsFilterMode === "negative") return s.includes("olumsuz") || s.includes("negative");
+    if (newsFilterMode === "neutral") return s.includes("nötr") || s.includes("notr") || s.includes("neutral");
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / newsPageSize));
+  if (newsPage > totalPages) newsPage = totalPages;
+  const start = (newsPage - 1) * newsPageSize;
+  const pageList = filtered.slice(start, start + newsPageSize);
+
+  const prevBtn = document.getElementById("newsPrevBtn");
+  const nextBtn = document.getElementById("newsNextBtn");
+  const pageInfo = document.getElementById("newsPageInfo");
+  if (pageInfo) pageInfo.textContent = `${newsPage} / ${totalPages}`;
+  if (prevBtn) prevBtn.disabled = newsPage <= 1;
+  if (nextBtn) nextBtn.disabled = newsPage >= totalPages;
+
+  if (!pageList.length){
     container.innerHTML = `<div class="p-4 text-sm text-[#888] font-semibold">Haber yok.</div>`;
     requestSendHeight(false);
     return;
@@ -959,7 +985,7 @@ function renderNews(){
     return d.toLocaleDateString("tr-TR", { day:"2-digit", month:"short", year:"numeric" });
   };
 
-  container.innerHTML = apiNews.map(n => {
+  container.innerHTML = pageList.map(n => {
   const dateText = n?.ts ? fmtDate(n.ts) : (n?.date || "");
   let url = String(n?.link || "").trim();
   
@@ -995,7 +1021,44 @@ function renderNews(){
   `;
 }).join("");
 
+  const finCard = document.getElementById("cardFinancials");
+  if (finCard) {
+    container.style.maxHeight = finCard.offsetHeight + "px";
+    container.style.overflowY = "auto";
+  }
+
   requestSendHeight(false);
+}
+
+function initNewsFilters(){
+  const wrap = document.querySelector(".news-filters");
+  if (!wrap) return;
+  wrap.addEventListener("click", (e) => {
+    const btn = e.target.closest(".news-filter-btn");
+    if (!btn) return;
+    const mode = btn.dataset.filter;
+    newsFilterMode = mode || "all";
+    wrap.querySelectorAll(".news-filter-btn").forEach(b => b.classList.toggle("active", b === btn));
+    newsPage = 1;
+    renderNews();
+  });
+
+  const prevBtn = document.getElementById("newsPrevBtn");
+  const nextBtn = document.getElementById("newsNextBtn");
+  if (prevBtn && !prevBtn.__bound) {
+    prevBtn.__bound = true;
+    prevBtn.addEventListener("click", () => {
+      newsPage = Math.max(1, newsPage - 1);
+      renderNews();
+    });
+  }
+  if (nextBtn && !nextBtn.__bound) {
+    nextBtn.__bound = true;
+    nextBtn.addEventListener("click", () => {
+      newsPage += 1;
+      renderNews();
+    });
+  }
 }
 
 
@@ -1095,7 +1158,7 @@ const sorted = rows.slice().sort((a, b) => {
     headerRow.innerHTML = `<th width="28%">Kalem</th>${headerCells}`;
   }
 
-  tbody.innerHTML = sorted.map(r => {
+  tbody.innerHTML = sorted.map((r, idx) => {
     const normItem = normalizeKey(r.item);
     const isEffTax = normItem === "effective tax rate";
     const cells = columns.map(k => {
@@ -1111,10 +1174,151 @@ const sorted = rows.slice().sort((a, b) => {
       return `<td>${formatFinancial(raw, r.value_type)}</td>`;
     }).join("");
 
-    return `<tr><td>${r.item || "-"}</td>${cells}</tr>`;
+    return `<tr data-idx="${idx}" class="fin-row"><td>${r.item || "-"}</td>${cells}</tr>`;
   }).join("");
 
   requestSendHeight(false);
+}
+
+function openTrendModal(row, mode){
+  const modal = document.getElementById("trendModal");
+  const titleEl = document.getElementById("trendModalTitle");
+  const closeBtn = document.getElementById("trendModalClose");
+  const chartEl = document.getElementById("trendChart");
+  if (!modal || !titleEl || !chartEl) return;
+
+  const columns = (mode === "quarterly") ? getQuarterColumns() : getAnnualColumns();
+  const labels = columns.map((k, idx) => (mode === "quarterly") ? getQuarterHeaderLabel(idx) : getAnnualHeaderLabel(idx));
+  const values = columns.map(k => {
+    if (mode === "quarterly") return row?.quarterly?.[k] ?? null;
+    return row?.annual?.[k] ?? null;
+  });
+
+  titleEl.textContent = row.item || "Trend";
+  modal.classList.remove("hidden");
+
+  if (trendChartInstance) {
+    trendChartInstance.destroy();
+    trendChartInstance = null;
+  }
+
+  if (window.ApexCharts) {
+    trendChartInstance = new ApexCharts(chartEl, {
+      chart: { type: "line", height: 260, toolbar: { show: false }, foreColor: "#cfcfcf" },
+      series: [{ name: row.item || "Value", data: values }],
+      xaxis: { categories: labels },
+      stroke: { width: 2, curve: "smooth" },
+      colors: ["#c2f50e"],
+      grid: { borderColor: "rgba(255,255,255,0.08)" },
+      tooltip: { theme: "dark" }
+    });
+    trendChartInstance.render();
+  } else {
+    chartEl.innerHTML = `<div style="color:#888; padding:16px;">Grafik yüklenemedi.</div>`;
+  }
+
+  if (closeBtn && !closeBtn.__bound) {
+    closeBtn.__bound = true;
+    closeBtn.addEventListener("click", () => modal.classList.add("hidden"));
+  }
+  const backdrop = modal.querySelector(".trend-modal-backdrop");
+  if (backdrop && !backdrop.__bound) {
+    backdrop.__bound = true;
+    backdrop.addEventListener("click", () => modal.classList.add("hidden"));
+  }
+}
+
+function initTrendRowClick(){
+  const tbody = document.getElementById("financialsBody");
+  if (!tbody || tbody.__bound) return;
+  tbody.__bound = true;
+  tbody.addEventListener("click", (e) => {
+    const tr = e.target.closest("tr.fin-row");
+    if (!tr) return;
+    const idx = Number(tr.getAttribute("data-idx"));
+    if (!Number.isFinite(idx)) return;
+    const allRows = (Array.isArray(apiFinancials) ? apiFinancials : []);
+    const tab = getActiveTab();
+    let rows = allRows.filter(i => i.type === tab);
+    if (!rows.length) {
+      const fallbackMap = { "income-statement": "income", "balance-sheet": "balance", "cash-flow-statement": "cash-flow" };
+      const fb = fallbackMap[tab];
+      if (fb) rows = allRows.filter(i => i.type === fb);
+    }
+    const row = rows.filter(r => !["metrics","ratios"].includes(r.type))[idx];
+    if (row) openTrendModal(row, financialPeriodMode);
+  });
+}
+
+function renderSimilarCompanies(){
+  const tbody = document.getElementById("similarBody");
+  const subtitle = document.getElementById("similarSubtitle");
+  if (!tbody) return;
+
+  const current = findCompanyInList(currentTicker);
+  if (!current) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:18px; color:#666; font-weight:900;">Benzer bulunamadı.</td></tr>`;
+    if (subtitle) subtitle.textContent = "-";
+    return;
+  }
+
+  const group = String(current.group || "").toLowerCase();
+  const sector = current.sector || current.sector_tr;
+  const industry = current.industry || current.industry_tr;
+  const map = window.__FIN_MAP || {};
+  const baseMc = map[current.ticker]?.["Piyasa Değeri"] || map[current.ticker]?.["Market Cap"] || null;
+
+  const candidates = (window.companies || []).filter(c => {
+    if (String(c.ticker || "").toUpperCase() === currentTicker) return false;
+    if (String(c.group || "").toLowerCase() !== group) return false;
+    if (industry && c.industry && c.industry !== industry) return false;
+    if (sector && c.sector && c.sector !== sector) return false;
+    return true;
+  });
+
+  const scored = candidates.map(c => {
+    const d = map[c.ticker] || {};
+    const mc = d["Piyasa Değeri"] || d["Market Cap"] || null;
+    const dist = (baseMc && mc) ? Math.abs(mc - baseMc) : Number.MAX_SAFE_INTEGER;
+    return { c, mc, dist, d };
+  }).filter(x => x.mc !== null).sort((a,b)=>a.dist-b.dist).slice(0,5);
+
+  if (subtitle) {
+    subtitle.textContent = `${group.toUpperCase()} · ${sector || "-"}${industry ? " · " + industry : ""}`;
+  }
+
+  if (!scored.length){
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:18px; color:#666; font-weight:900;">Benzer bulunamadı.</td></tr>`;
+    return;
+  }
+
+  const rows = scored.map(x => {
+    const d = x.d || {};
+    const sym = currencySymbolForTicker(x.c.ticker);
+    const rev = d["Satış Gelirleri"] || d["Revenue"];
+    const opm = d["Faaliyet Kâr Marjı"] || d["Faaliyet Kar Marjı"];
+    const pe = d["F/K"];
+    const pb = d["PD/DD"];
+    return `
+      <tr class="similar-row" data-ticker="${x.c.ticker}">
+        <td>${x.c.name || x.c.ticker}</td>
+        <td>${Number.isFinite(x.mc) ? formatCompactWithSymbol(x.mc, sym) : "-"}</td>
+        <td>${Number.isFinite(rev) ? formatCompactWithSymbol(rev, sym) : "-"}</td>
+        <td>${Number.isFinite(opm) ? (opm*100).toFixed(1)+"%" : "-"}</td>
+        <td>${Number.isFinite(pe) ? Number(pe).toFixed(2) : "-"}</td>
+        <td>${Number.isFinite(pb) ? Number(pb).toFixed(2) : "-"}</td>
+      </tr>
+    `;
+  }).join("");
+
+  tbody.innerHTML = rows;
+
+  tbody.querySelectorAll(".similar-row").forEach(tr => {
+    tr.addEventListener("click", () => {
+      const t = tr.getAttribute("data-ticker");
+      if (t) loadAll(t);
+    });
+  });
 }
 
 function buildFullChartFromHistory(history){
@@ -1646,6 +1850,7 @@ try {
   
   if (typeof renderMiniBars === "function") renderMiniBars();
   if (typeof toggleOverviewMetricsCard === "function") toggleOverviewMetricsCard(getActiveTab());
+  if (typeof renderSimilarCompanies === "function") renderSimilarCompanies();
 
   requestSendHeight(true);
   setTimeout(() => requestSendHeight(true), 150);
@@ -1800,6 +2005,8 @@ if (!window.ApexCharts){
   initSearch();
   lockChartWheel();
   initPeriodToggle();
+  initNewsFilters();
+  initTrendRowClick();
 
   const urlTicker = getTickerFromQuery();
   document.getElementById("tickerSearch").value = urlTicker;
