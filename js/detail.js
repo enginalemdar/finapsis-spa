@@ -338,21 +338,45 @@ async function fetchComFinancials(ticker) {
             const json = await res.json();
 
             if (Array.isArray(json) && json.length > 0 && json[0].financials) {
+                const fin = json[0].financials || [];
+                const metrics = json[0].metrics || fin.filter(r => r.type === "ratios" || r.type === "metrics");
                 return { 
-                  financials: json[0].financials || [], 
-                  metrics: json[0].metrics || [],
+                  financials: fin, 
+                  metrics: metrics,
                   lastTQ: json[0].lastTQ,
                   lastTA: json[0].lastTA
                 };
             }
 
             if (json.financials && Array.isArray(json.financials)) {
+                const fin = json.financials;
+                const metrics = json.metrics || fin.filter(r => r.type === "ratios" || r.type === "metrics");
                 return { 
-                  financials: json.financials, 
-                  metrics: json.metrics || [],
+                  financials: fin, 
+                  metrics: metrics,
                   lastTQ: json.lastTQ,
                   lastTA: json.lastTA
                 };
+            }
+
+            if (json && Array.isArray(json.data) && json.data.length > 0) {
+                const d0 = json.data[0];
+                if (d0 && d0.financials) {
+                    return {
+                      financials: d0.financials || [],
+                      metrics: d0.metrics || [],
+                      lastTQ: d0.lastTQ,
+                      lastTA: d0.lastTA
+                    };
+                }
+                if (d0 && d0.data && d0.data.financials) {
+                    return {
+                      financials: d0.data.financials || [],
+                      metrics: d0.data.metrics || [],
+                      lastTQ: d0.data.lastTQ,
+                      lastTA: d0.data.lastTA
+                    };
+                }
             }
 
             if (Array.isArray(json)) {
@@ -542,7 +566,7 @@ async function renderBenchmarksMetrics() {
 
     const rows = (Array.isArray(window.apiMetrics) && window.apiMetrics.length)
       ? window.apiMetrics
-      : (Array.isArray(window.apiFinancials) ? window.apiFinancials.filter(r => r.type === "metrics") : []);
+      : (Array.isArray(window.apiFinancials) ? window.apiFinancials.filter(r => r.type === "metrics" || r.type === "ratios") : []);
     
     const pickMetricVal = (row) => {
         if (!row) return null;
@@ -607,7 +631,6 @@ async function renderBenchmarksMetrics() {
         if (headerMcap) headerMcap.textContent = mcapDisplay;
     }
 
-    const live = getLivePriceFromGlobal(currentTicker);
     const livePrice = (live.cur !== null && live.cur > 0) ? live.cur : null;
     const epsVal = findVal(["Hisse Başına Kazanç", "EPS (Diluted)", "EPS (Basic)", "EPS"]);
     const bookVal = findVal(["Defter Değeri", "Tangible Book Value"]);
@@ -787,11 +810,15 @@ const findRow = (type, keys) => rows.find(r => {
     return;
   }
 
-  const keys = ["tminus3","tminus2","tminus1","t"];
+  const keysNew = ["tminus3","tminus2","tminus1","t"];
+  const keysOld = ["tminus3","tminus2","tminus1","ttm"];
   const labels = ["D-3","D-2","D-1","D-0"];
 
-  const revVals = keys.map(k => Number(rev?.quarterly?.[k]));
-  const profVals = keys.map(k => Number(prof?.quarterly?.[k]));
+  const useOld = rev && rev.quarterly === undefined && ("ttm" in rev);
+  const keys = useOld ? keysOld : keysNew;
+
+  const revVals = keys.map(k => Number(useOld ? rev?.[k] : rev?.quarterly?.[k]));
+  const profVals = keys.map(k => Number(useOld ? prof?.[k] : prof?.quarterly?.[k]));
 
   const maxRev = Math.max(...revVals.map(v => Number.isFinite(v) ? Math.abs(v) : 0), 1);
   const maxProf = Math.max(...profVals.map(v => Number.isFinite(v) ? Math.abs(v) : 0), 1);
@@ -920,6 +947,8 @@ const sorted = rows.slice().sort((a, b) => {
   const pickAnnual = (r, key) => {
     if (!r) return null;
     if (r.annual && r.annual[key] !== undefined) return r.annual[key];
+    if (r.ttm !== undefined && key === "t") return r.ttm;
+    if (r.ttm !== undefined && key === "tminus1") return r.ttm;
     if (r[key] !== undefined) return r[key];
     return null;
   };
