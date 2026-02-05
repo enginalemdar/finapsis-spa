@@ -1021,13 +1021,31 @@ function renderNews(){
   `;
 }).join("");
 
-  const finCard = document.getElementById("cardFinancials");
-  if (finCard) {
-    container.style.maxHeight = finCard.offsetHeight + "px";
-    container.style.overflowY = "auto";
-  }
+  setSideStackHeights();
 
   requestSendHeight(false);
+}
+
+function setSideStackHeights(){
+  const finCard = document.getElementById("cardFinancials");
+  const side = document.getElementById("sideStack");
+  const newsList = document.getElementById("newsList");
+  const similarCard = document.getElementById("similarCard");
+  if (!finCard || !side || !newsList || !similarCard) return;
+
+  side.style.maxHeight = finCard.offsetHeight + "px";
+  side.style.overflow = "hidden";
+
+  const head = side.querySelector(".card-head");
+  const pagination = side.querySelector(".news-pagination");
+  const headH = head ? head.offsetHeight : 0;
+  const pagH = pagination ? pagination.offsetHeight : 0;
+  const simH = similarCard.offsetHeight;
+  const total = finCard.offsetHeight;
+  const listH = Math.max(140, total - headH - pagH - simH - 16);
+
+  newsList.style.maxHeight = listH + "px";
+  newsList.style.overflowY = "auto";
 }
 
 function initNewsFilters(){
@@ -1071,7 +1089,9 @@ if (tabName === "ratios") {
 }
 
   const allRows = (Array.isArray(apiFinancials) ? apiFinancials : []);
-  let rows = allRows.filter(i => i.type === tabName);
+  let rows = (tabName === "metrics")
+    ? (Array.isArray(apiMetrics) ? apiMetrics : [])
+    : allRows.filter(i => i.type === tabName);
   if (!rows.length) {
     const fallbackMap = {
       "income-statement": "income",
@@ -1098,7 +1118,7 @@ if (tabName === "ratios") {
   ]);
 
   rows = rows
-    .filter(r => !dropItems.has(normalizeKey(r.item)))
+    .filter(r => tabName === "metrics" ? true : !dropItems.has(normalizeKey(r.item)))
     .map((r, idx) => ({ ...r, __idx: idx })); 
 
 const sorted = rows.slice().sort((a, b) => {
@@ -1188,11 +1208,13 @@ function openTrendModal(row, mode){
   if (!modal || !titleEl || !chartEl) return;
 
   const columns = (mode === "quarterly") ? getQuarterColumns() : getAnnualColumns();
-  const labels = columns.map((k, idx) => (mode === "quarterly") ? getQuarterHeaderLabel(idx) : getAnnualHeaderLabel(idx));
-  const values = columns.map(k => {
+  const labelsRaw = columns.map((k, idx) => (mode === "quarterly") ? getQuarterHeaderLabel(idx) : getAnnualHeaderLabel(idx));
+  const valuesRaw = columns.map(k => {
     if (mode === "quarterly") return row?.quarterly?.[k] ?? null;
     return row?.annual?.[k] ?? null;
   });
+  const labels = labelsRaw.slice().reverse();
+  const values = valuesRaw.slice().reverse();
 
   titleEl.textContent = row.item || "Trend";
   modal.classList.remove("hidden");
@@ -1237,18 +1259,23 @@ function initTrendRowClick(){
     if (!tr) return;
     const idx = Number(tr.getAttribute("data-idx"));
     if (!Number.isFinite(idx)) return;
-    const allRows = (Array.isArray(apiFinancials) ? apiFinancials : []);
     const tab = getActiveTab();
-    let rows = allRows.filter(i => i.type === tab);
+    let rows = (tab === "metrics")
+      ? (Array.isArray(apiMetrics) ? apiMetrics : [])
+      : (Array.isArray(apiFinancials) ? apiFinancials : []).filter(i => i.type === tab);
     if (!rows.length) {
       const fallbackMap = { "income-statement": "income", "balance-sheet": "balance", "cash-flow-statement": "cash-flow" };
       const fb = fallbackMap[tab];
-      if (fb) rows = allRows.filter(i => i.type === fb);
+      if (fb) rows = (Array.isArray(apiFinancials) ? apiFinancials : []).filter(i => i.type === fb);
     }
-    const row = rows.filter(r => !["metrics","ratios"].includes(r.type))[idx];
+    const row = rows.filter(r => !["metrics","ratios"].includes(r.type))[idx] || rows[idx];
     if (row) openTrendModal(row, financialPeriodMode);
   });
 }
+
+window.addEventListener("resize", () => {
+  setSideStackHeights();
+});
 
 function renderSimilarCompanies(){
   const tbody = document.getElementById("similarBody");
@@ -1851,6 +1878,7 @@ try {
   if (typeof renderMiniBars === "function") renderMiniBars();
   if (typeof toggleOverviewMetricsCard === "function") toggleOverviewMetricsCard(getActiveTab());
   if (typeof renderSimilarCompanies === "function") renderSimilarCompanies();
+  setSideStackHeights();
 
   requestSendHeight(true);
   setTimeout(() => requestSendHeight(true), 150);
