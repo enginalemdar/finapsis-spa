@@ -2624,10 +2624,32 @@ tr.sec-row-level-3:hover td {
   backdrop-filter: blur(6px);
 }
 
+#view-detail #cardFinancials {
+  overflow: visible;
+}
+
+#view-detail #financialTableWrap {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
 #view-detail .card-head {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.03);
+}
+
+#view-detail #sideStack .card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#view-detail .val-up {
+  color: #00ff88;
+}
+#view-detail .val-down {
+  color: #ff4444;
 }
 
 #view-detail .tab-scroll {
