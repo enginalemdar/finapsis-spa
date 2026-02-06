@@ -1406,6 +1406,14 @@ function renderSimilarCompanies(){
 
   scored.sort((a,b)=> (b.mc || 0) - (a.mc || 0));
   const top = scored.slice(0,5);
+  const currentInList = top.some(x => String(x.c.ticker || "").toUpperCase() === currentTicker);
+  if (!currentInList && scored.length) {
+    const cur = scored.find(x => String(x.c.ticker || "").toUpperCase() === currentTicker);
+    if (cur) {
+      top.pop();
+      top.unshift(cur);
+    }
+  }
 
   if (subtitle) {
     subtitle.textContent = `${group.toUpperCase()} · ${sector || "-"}${industry ? " · " + industry : ""}`;
