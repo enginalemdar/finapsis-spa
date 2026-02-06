@@ -1030,8 +1030,7 @@ function setSideStackHeights(){
   const finCard = document.getElementById("cardFinancials");
   const side = document.getElementById("sideStack");
   const newsList = document.getElementById("newsList");
-  const similarCard = document.getElementById("similarCard");
-  if (!finCard || !side || !newsList || !similarCard) return;
+  if (!finCard || !side || !newsList) return;
 
   side.style.maxHeight = finCard.offsetHeight + "px";
   side.style.overflow = "hidden";
@@ -1040,9 +1039,8 @@ function setSideStackHeights(){
   const pagination = side.querySelector(".news-pagination");
   const headH = head ? head.offsetHeight : 0;
   const pagH = pagination ? pagination.offsetHeight : 0;
-  const simH = similarCard.offsetHeight;
   const total = finCard.offsetHeight;
-  const listH = Math.max(140, total - headH - pagH - simH - 16);
+  const listH = Math.max(140, total - headH - pagH - 16);
 
   newsList.style.maxHeight = listH + "px";
   newsList.style.overflowY = "auto";
@@ -1178,6 +1176,21 @@ const sorted = rows.slice().sort((a, b) => {
     headerRow.innerHTML = `<th width="28%">Kalem</th>${headerCells}`;
   }
 
+  const dayItems = new Set([
+    "stok suresi",
+    "alacak suresi",
+    "borc suresi",
+    "nakit dongusu"
+  ]);
+  const moneyItems = new Set([
+    "net borc",
+    "defter degeri",
+    "hisse fiyati",
+    "serbest nakit akisi",
+    "isletme sermayesi",
+    "piyasa degeri"
+  ]);
+
   tbody.innerHTML = sorted.map((r, idx) => {
     const normItem = normalizeKey(r.item);
     const isEffTax = normItem === "effective tax rate";
@@ -1194,6 +1207,16 @@ const sorted = rows.slice().sort((a, b) => {
       if (String(r.value_type || "").toLowerCase() === "percentage") {
         const cls = vNum > 0 ? "val-up" : (vNum < 0 ? "val-down" : "");
         return `<td class="${cls}">${vNum === null ? "-" : (vNum * 100).toFixed(2) + "%"}</td>`;
+      }
+
+      if (tabName === "metrics") {
+        if (dayItems.has(normItem)) {
+          return `<td>${vNum === null ? "-" : Math.round(vNum) + " Gün"}</td>`;
+        }
+        if (moneyItems.has(normItem)) {
+          return `<td>${formatFinancial(raw, r.value_type)}</td>`;
+        }
+        return `<td>${vNum === null ? "-" : vNum.toFixed(2)}</td>`;
       }
 
       return `<td>${formatFinancial(raw, r.value_type)}</td>`;
@@ -1331,9 +1354,16 @@ function renderSimilarCompanies(){
     const opm = d["Faaliyet Kâr Marjı"] || d["Faaliyet Kar Marjı"];
     const pe = d["F/K"];
     const pb = d["PD/DD"];
+    const logo = (x.c.logourl || "").trim();
+    const name = x.c.name || x.c.ticker;
     return `
       <tr class="similar-row" data-ticker="${x.c.ticker}">
-        <td>${x.c.name || x.c.ticker}</td>
+        <td>
+          <div class="similar-cell">
+            ${logo ? `<img class="similar-logo" src="${logo}" alt="${name}" />` : `<div class="similar-logo"></div>`}
+            <span>${name}</span>
+          </div>
+        </td>
         <td>${Number.isFinite(x.mc) ? formatCompactWithSymbol(x.mc, sym) : "-"}</td>
         <td>${Number.isFinite(rev) ? formatCompactWithSymbol(rev, sym) : "-"}</td>
         <td>${Number.isFinite(opm) ? (opm*100).toFixed(1)+"%" : "-"}</td>
