@@ -113,6 +113,30 @@
           </div>
         </div>
       </div>
+
+      <div class="fin-card p-5" id="similarCard">
+        <div class="flex justify-between items-center mb-4">
+          <span class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest">Benzer Şirketler</span>
+        </div>
+        <div class="text-xs text-[#6b6b6b] font-semibold mb-3" id="similarSubtitle">-</div>
+        <div class="overflow-x-auto">
+          <table class="fin-table" aria-label="Benzer şirketler">
+            <thead>
+              <tr>
+                <th width="32%">Şirket</th>
+                <th>Market Cap</th>
+                <th>Revenue</th>
+                <th>Faaliyet Kar Marjı</th>
+                <th>F/K</th>
+                <th>PD/DD</th>
+              </tr>
+            </thead>
+            <tbody id="similarBody">
+              <tr><td colspan="6" style="text-align:center; padding:18px; color:#666; font-weight:900;">Benzerler yükleniyor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <div class="lg:col-span-4 flex flex-col gap-6">
@@ -184,29 +208,6 @@
           <button id="newsPrevBtn" class="news-page-btn">Önceki</button>
           <span id="newsPageInfo" class="news-page-info">1 / 1</span>
           <button id="newsNextBtn" class="news-page-btn">Sonraki</button>
-        </div>
-        <div class="fin-card p-5" id="similarCard">
-          <div class="flex justify-between items-center mb-4">
-            <span class="text-[#8a8a8a] text-xs font-extrabold uppercase tracking-widest">Benzer Şirketler</span>
-          </div>
-          <div class="text-xs text-[#6b6b6b] font-semibold mb-3" id="similarSubtitle">-</div>
-          <div class="overflow-x-auto">
-            <table class="fin-table" aria-label="Benzer şirketler">
-              <thead>
-                <tr>
-                  <th width="28%">Şirket</th>
-                  <th>Market Cap</th>
-                  <th>Revenue</th>
-                  <th>Faaliyet Kar Marjı</th>
-                  <th>F/K</th>
-                  <th>PD/DD</th>
-                </tr>
-              </thead>
-              <tbody id="similarBody">
-                <tr><td colspan="6" style="text-align:center; padding:18px; color:#666; font-weight:900;">Benzerler yükleniyor...</td></tr>
-              </tbody>
-            </table>
-          </div>
         </div>
       </div>
     </div>
