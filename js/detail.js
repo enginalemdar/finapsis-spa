@@ -1423,6 +1423,13 @@ function renderSimilarCompanies(){
 
   if (!top.length){
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:18px; color:#666; font-weight:900;">Benzer bulunamadı.</td></tr>`;
+    if (!window.__SIMILAR_WAITING && typeof finBuildMapForActiveGroup === "function") {
+      window.__SIMILAR_WAITING = true;
+      finBuildMapForActiveGroup(() => {
+        window.__SIMILAR_WAITING = false;
+        renderSimilarCompanies();
+      });
+    }
     return;
   }
 
@@ -1950,6 +1957,13 @@ renderAbout();
     
     const stockGroups = ['bist', 'nyse', 'nasdaq', 'sp'];
     const isCompany = cObj && stockGroups.includes((cObj.group || '').toLowerCase());
+
+    if (cObj && typeof setGroup === "function") {
+      const g = String(cObj.group || "").toLowerCase();
+      if (g && window.activeGroup !== g) {
+        setGroup(g);
+      }
+    }
     
     const cardAbout = document.getElementById("cardAbout");
     const cardFin = document.getElementById("cardFinancials");
