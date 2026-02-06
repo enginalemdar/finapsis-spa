@@ -1253,6 +1253,12 @@ const sorted = rows.slice().sort((a, b) => {
       }
 
       if (tabName === "metrics") {
+        const rawNorm = normalizeKey(r.item || "");
+        if (rawNorm.includes("isletme sermayesi") &&
+            !rawNorm.includes("devir") &&
+            !rawNorm.includes("oran")) {
+          return `<td>${formatFinancial(raw, r.value_type)}</td>`;
+        }
         if (dayItems.has(normItem)) {
           return `<td>${vNum === null ? "-" : Math.round(vNum) + " Gün"}</td>`;
         }
