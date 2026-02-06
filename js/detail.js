@@ -1374,7 +1374,9 @@ function renderSimilarCompanies(){
   const sector = current.sector || current.sector_tr;
   const industry = current.industry || current.industry_tr;
   const map = window.__FIN_MAP || {};
-  const baseMc = map[current.ticker]?.["Piyasa Değeri"] || map[current.ticker]?.["Market Cap"] || null;
+  const baseMc = map[current.ticker]?.["Piyasa Değeri"] ||
+    map[current.ticker]?.["Market Cap"] ||
+    current.market_cap || current.marketcap || current.mcap || null;
 
   const isUsGroup = (g) => ["nyse","nasdaq","sp"].includes(g);
   const sameGroup = (g) => {
@@ -1400,7 +1402,7 @@ function renderSimilarCompanies(){
 
   const scored = candidates.map(c => {
     const d = map[c.ticker] || {};
-    const mc = d["Piyasa Değeri"] || d["Market Cap"] || null;
+    const mc = d["Piyasa Değeri"] || d["Market Cap"] || c.market_cap || c.marketcap || c.mcap || null;
     return { c, mc, d };
   }).filter(x => x.mc !== null);
 
