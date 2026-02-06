@@ -1197,7 +1197,7 @@ const sorted = rows.slice().sort((a, b) => {
     "borc suresi",
     "nakit dongusu"
   ]);
-  const moneyItems = new Set([
+  const moneyExact = new Set([
     "net borc",
     "defter degeri",
     "firma degeri",
@@ -1206,6 +1206,15 @@ const sorted = rows.slice().sort((a, b) => {
     "isletme sermayesi",
     "piyasa degeri"
   ]);
+  const moneyContains = [
+    "net borc",
+    "defter degeri",
+    "firma degeri",
+    "hisse fiyati",
+    "serbest nakit akisi",
+    "isletme sermayesi",
+    "piyasa degeri"
+  ];
   const countItems = new Set([
     "hisse adedi",
     "shares outstanding (basic)",
@@ -1235,7 +1244,7 @@ const sorted = rows.slice().sort((a, b) => {
         if (dayItems.has(normItem)) {
           return `<td>${vNum === null ? "-" : Math.round(vNum) + " Gün"}</td>`;
         }
-        if (moneyItems.has(normItem) || normItem.includes("isletme sermayesi") || normItem.includes("firma degeri")) {
+        if (moneyExact.has(normItem) || moneyContains.some(k => normItem.includes(k))) {
           return `<td>${formatFinancial(raw, r.value_type)}</td>`;
         }
         if (countItems.has(normItem)) {
