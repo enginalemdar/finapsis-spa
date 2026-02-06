@@ -2653,6 +2653,22 @@ tr.sec-row-level-3:hover td {
   gap: 8px;
 }
 
+#view-detail .similar-row.current td {
+  color: #c2f50e;
+  font-weight: 900;
+}
+
+#view-detail .similar-row {
+  cursor: pointer;
+}
+#view-detail .similar-row:hover td {
+  background: #141614;
+}
+
+#view-detail .fin-row:hover td {
+  background: #141614;
+}
+
 #view-detail .card-head {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
