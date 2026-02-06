@@ -2634,7 +2634,7 @@ tr.sec-row-level-3:hover td {
 }
 
 #view-detail #financialTableWrap {
-  max-height: 520px;
+  max-height: 720px;
   overflow-y: auto;
 }
 
