@@ -33,6 +33,7 @@ let apiNews = [];
 let apiFinancials = [];       
 let apiMetrics = [];
 let apiMeta = { lastTQ: null, lastTA: null };
+let hasQuarterly = true;
 let financialPeriodMode = "annual"; // annual | quarterly
 let newsFilterMode = "all";
 let newsPage = 1;
@@ -461,7 +462,8 @@ async function fetchComFinancials(ticker) {
                   financials: fin, 
                   metrics: metrics,
                   lastTQ: json[0].lastTQ,
-                  lastTA: json[0].lastTA
+                  lastTA: json[0].lastTA,
+                  hasQuarterly: json[0].hasQuarterly
                 };
             }
 
@@ -472,7 +474,8 @@ async function fetchComFinancials(ticker) {
                   financials: fin, 
                   metrics: metrics,
                   lastTQ: json.lastTQ,
-                  lastTA: json.lastTA
+                  lastTA: json.lastTA,
+                  hasQuarterly: json.hasQuarterly
                 };
             }
 
@@ -483,7 +486,8 @@ async function fetchComFinancials(ticker) {
                       financials: d0.financials || [],
                       metrics: d0.metrics || [],
                       lastTQ: d0.lastTQ,
-                      lastTA: d0.lastTA
+                      lastTA: d0.lastTA,
+                      hasQuarterly: d0.hasQuarterly
                     };
                 }
                 if (d0 && d0.data && d0.data.financials) {
@@ -491,21 +495,22 @@ async function fetchComFinancials(ticker) {
                       financials: d0.data.financials || [],
                       metrics: d0.data.metrics || [],
                       lastTQ: d0.data.lastTQ,
-                      lastTA: d0.data.lastTA
+                      lastTA: d0.data.lastTA,
+                      hasQuarterly: d0.data.hasQuarterly
                     };
                 }
             }
 
             if (Array.isArray(json)) {
-                return { financials: json, metrics: [], lastTQ: null, lastTA: null };
+                return { financials: json, metrics: [], lastTQ: null, lastTA: null, hasQuarterly: true };
             }
 
-            return { financials: [], metrics: [], lastTQ: null, lastTA: null };
+            return { financials: [], metrics: [], lastTQ: null, lastTA: null, hasQuarterly: true };
         }
     } catch (e) { 
         console.warn("Financials fetch failed", e); 
     }
-    return { financials: [], metrics: [], lastTQ: null, lastTA: null };
+    return { financials: [], metrics: [], lastTQ: null, lastTA: null, hasQuarterly: true };
 }
 
 function renderHeaderFromCompanies(ticker){
@@ -1994,11 +1999,14 @@ try {
   apiFinancials = (res && res.financials) ? res.financials : [];
   apiMetrics = (res && res.metrics) ? res.metrics : [];
   apiMeta = { lastTQ: res?.lastTQ || null, lastTA: res?.lastTA || null };
+  hasQuarterly = res?.hasQuarterly !== false;
   window.apiFinancials = apiFinancials;
   window.apiMetrics = apiMetrics;
   window.apiMeta = apiMeta;
+  window.hasQuarterly = hasQuarterly;
 
   setPeriodHeaders(apiMeta);
+  updatePeriodToggleAvailability(hasQuarterly);
 
   renderFinancialTable(getActiveTab());
   
@@ -2070,6 +2078,7 @@ function initPeriodToggle(){
   if (!annualBtn || !quarterBtn) return;
 
   const setMode = (mode) => {
+    if (mode === "quarterly" && quarterBtn.disabled) return;
     financialPeriodMode = mode;
     annualBtn.classList.toggle("active", mode === "annual");
     quarterBtn.classList.toggle("active", mode === "quarterly");
@@ -2085,6 +2094,27 @@ function initPeriodToggle(){
     quarterBtn.__bound = true;
     quarterBtn.addEventListener("click", () => setMode("quarterly"));
   }
+}
+
+function updatePeriodToggleAvailability(flag){
+  const annualBtn = document.getElementById("periodAnnualBtn");
+  const quarterBtn = document.getElementById("periodQuarterBtn");
+  if (!annualBtn || !quarterBtn) return;
+
+  const available = flag !== false;
+  quarterBtn.disabled = !available;
+  quarterBtn.classList.toggle("disabled", !available);
+  quarterBtn.setAttribute("aria-disabled", !available ? "true" : "false");
+  quarterBtn.tabIndex = !available ? -1 : 0;
+
+  if (!available && financialPeriodMode === "quarterly") {
+    financialPeriodMode = "annual";
+  }
+
+  annualBtn.classList.toggle("active", financialPeriodMode === "annual");
+  quarterBtn.classList.toggle("active", financialPeriodMode === "quarterly");
+  renderFinancialTable(getActiveTab());
+  requestSendHeight(false);
 }
 
 function initRanges(){
