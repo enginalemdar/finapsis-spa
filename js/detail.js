@@ -183,6 +183,7 @@ function normalizeKey(s){
   return String(s || "")
     .toLowerCase()
     .replace(/ı/g,"i").replace(/ğ/g,"g").replace(/ü/g,"u").replace(/ş/g,"s").replace(/ö/g,"o").replace(/ç/g,"c")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -1234,7 +1235,7 @@ const sorted = rows.slice().sort((a, b) => {
         if (dayItems.has(normItem)) {
           return `<td>${vNum === null ? "-" : Math.round(vNum) + " Gün"}</td>`;
         }
-        if (moneyItems.has(normItem)) {
+        if (moneyItems.has(normItem) || normItem.includes("isletme sermayesi") || normItem.includes("firma degeri")) {
           return `<td>${formatFinancial(raw, r.value_type)}</td>`;
         }
         if (countItems.has(normItem)) {
