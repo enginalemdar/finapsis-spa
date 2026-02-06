@@ -1376,31 +1376,47 @@ function renderSimilarCompanies(){
   const map = window.__FIN_MAP || {};
   const baseMc = map[current.ticker]?.["Piyasa Değeri"] || map[current.ticker]?.["Market Cap"] || null;
 
-  const candidates = (window.companies || []).filter(c => {
-    if (String(c.ticker || "").toUpperCase() === currentTicker) return false;
-    if (String(c.group || "").toLowerCase() !== group) return false;
+  const isUsGroup = (g) => ["nyse","nasdaq","sp"].includes(g);
+  const sameGroup = (g) => {
+    if (isUsGroup(group)) return isUsGroup(g);
+    return g === group;
+  };
+
+  const allCompanies = (window.companies || []);
+  const baseCandidates = allCompanies.filter(c => sameGroup(String(c.group || "").toLowerCase()));
+
+  let candidates = baseCandidates.filter(c => {
     if (industry && c.industry && c.industry !== industry) return false;
     if (sector && c.sector && c.sector !== sector) return false;
     return true;
   });
 
+  if (!candidates.length) {
+    candidates = baseCandidates.filter(c => sector && c.sector && c.sector === sector);
+  }
+  if (!candidates.length) {
+    candidates = baseCandidates;
+  }
+
   const scored = candidates.map(c => {
     const d = map[c.ticker] || {};
     const mc = d["Piyasa Değeri"] || d["Market Cap"] || null;
-    const dist = (baseMc && mc) ? Math.abs(mc - baseMc) : Number.MAX_SAFE_INTEGER;
-    return { c, mc, dist, d };
-  }).filter(x => x.mc !== null).sort((a,b)=>a.dist-b.dist).slice(0,5);
+    return { c, mc, d };
+  }).filter(x => x.mc !== null);
+
+  scored.sort((a,b)=> (b.mc || 0) - (a.mc || 0));
+  const top = scored.slice(0,5);
 
   if (subtitle) {
     subtitle.textContent = `${group.toUpperCase()} · ${sector || "-"}${industry ? " · " + industry : ""}`;
   }
 
-  if (!scored.length){
+  if (!top.length){
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:18px; color:#666; font-weight:900;">Benzer bulunamadı.</td></tr>`;
     return;
   }
 
-  const rows = scored.map(x => {
+  const rows = top.map(x => {
     const d = x.d || {};
     const sym = currencySymbolForTicker(x.c.ticker);
     const rev = d["Satış Gelirleri"] || d["Revenue"];
@@ -1409,8 +1425,9 @@ function renderSimilarCompanies(){
     const pb = d["PD/DD"];
     const logo = (x.c.logourl || "").trim();
     const name = x.c.name || x.c.ticker;
+    const isCurrent = String(x.c.ticker || "").toUpperCase() === currentTicker;
     return `
-      <tr class="similar-row" data-ticker="${x.c.ticker}">
+      <tr class="similar-row${isCurrent ? " current" : ""}" data-ticker="${x.c.ticker}">
         <td>
           <div class="similar-cell">
             ${logo ? `<img class="similar-logo" src="${logo}" alt="${name}" />` : `<div class="similar-logo"></div>`}
