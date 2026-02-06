@@ -1215,6 +1215,17 @@ const sorted = rows.slice().sort((a, b) => {
     "isletme sermayesi",
     "piyasa degeri"
   ];
+  const isMoneyMetric = (rawItem, normItem) => {
+    if (moneyExact.has(normItem) || moneyContains.some(k => normItem.includes(k))) return true;
+    const raw = String(rawItem || "").toLowerCase();
+    if (raw.includes("işletme sermayesi") || raw.includes("isletme sermayesi")) return true;
+    if (raw.includes("working capital")) return true;
+    if (raw.includes("net debt")) return true;
+    if (raw.includes("book value")) return true;
+    if (raw.includes("enterprise value")) return true;
+    if (raw.includes("market cap")) return true;
+    return false;
+  };
   const countItems = new Set([
     "hisse adedi",
     "shares outstanding (basic)",
@@ -1244,7 +1255,7 @@ const sorted = rows.slice().sort((a, b) => {
         if (dayItems.has(normItem)) {
           return `<td>${vNum === null ? "-" : Math.round(vNum) + " Gün"}</td>`;
         }
-        if (moneyExact.has(normItem) || moneyContains.some(k => normItem.includes(k))) {
+        if (isMoneyMetric(r.item, normItem)) {
           return `<td>${formatFinancial(raw, r.value_type)}</td>`;
         }
         if (countItems.has(normItem)) {
