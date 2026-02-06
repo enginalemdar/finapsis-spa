@@ -183,6 +183,7 @@ function normalizeKey(s){
   return String(s || "")
     .toLowerCase()
     .replace(/ı/g,"i").replace(/ğ/g,"g").replace(/ü/g,"u").replace(/ş/g,"s").replace(/ö/g,"o").replace(/ç/g,"c")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -354,6 +355,20 @@ function formatCompactWithSymbol(n, sym){
   const scaled = v / div;
   const s = scaled.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
   return suf ? `${s}${suf}${sym}` : `${s}${sym}`;
+}
+
+function formatCountCompact(n){
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "-";
+  const abs = Math.abs(v);
+  let div = 1, suf = "";
+  if (abs >= 1e12) { div = 1e12; suf = "T"; }
+  else if (abs >= 1e9) { div = 1e9; suf = "B"; }
+  else if (abs >= 1e6) { div = 1e6; suf = "M"; }
+  else if (abs >= 1e3) { div = 1e3; suf = "K"; }
+  const scaled = v / div;
+  const s = scaled.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+  return suf ? `${s}${suf}` : `${s}`;
 }
 
 function getFinancialsEndpointForTicker(ticker){
@@ -1182,13 +1197,41 @@ const sorted = rows.slice().sort((a, b) => {
     "borc suresi",
     "nakit dongusu"
   ]);
-  const moneyItems = new Set([
+  const moneyExact = new Set([
     "net borc",
     "defter degeri",
+    "firma degeri",
     "hisse fiyati",
     "serbest nakit akisi",
     "isletme sermayesi",
     "piyasa degeri"
+  ]);
+  const moneyContains = [
+    "net borc",
+    "defter degeri",
+    "firma degeri",
+    "hisse fiyati",
+    "serbest nakit akisi",
+    "isletme sermayesi",
+    "piyasa degeri"
+  ];
+  const isMoneyMetric = (rawItem, normItem) => {
+    if (moneyExact.has(normItem) || moneyContains.some(k => normItem.includes(k))) return true;
+    const raw = String(rawItem || "").toLowerCase();
+    if (raw.includes("working capital")) return true;
+    if (raw.includes("net debt")) return true;
+    if (raw.includes("book value")) return true;
+    if (raw.includes("enterprise value")) return true;
+    if (raw.includes("market cap")) return true;
+    // İşletme Sermayesi: devir/oran olmayanları para say
+    if (/isletme sermayesi(?!.*(devir|orani))/.test(normItem)) return true;
+    return false;
+  };
+  const countItems = new Set([
+    "hisse adedi",
+    "shares outstanding (basic)",
+    "shares outstanding (diluted)",
+    "total common shares outstanding"
   ]);
 
   tbody.innerHTML = sorted.map((r, idx) => {
@@ -1210,11 +1253,21 @@ const sorted = rows.slice().sort((a, b) => {
       }
 
       if (tabName === "metrics") {
+        const rawItem = String(r.item || "");
+        if (/sermayesi/i.test(rawItem) && !/(devir|oran)/i.test(rawItem)) {
+          return `<td>${formatFinancial(raw, r.value_type)}</td>`;
+        }
+        if (/working capital/i.test(rawItem)) {
+          return `<td>${formatFinancial(raw, r.value_type)}</td>`;
+        }
         if (dayItems.has(normItem)) {
           return `<td>${vNum === null ? "-" : Math.round(vNum) + " Gün"}</td>`;
         }
-        if (moneyItems.has(normItem)) {
+        if (isMoneyMetric(r.item, normItem)) {
           return `<td>${formatFinancial(raw, r.value_type)}</td>`;
+        }
+        if (countItems.has(normItem)) {
+          return `<td>${vNum === null ? "-" : formatCountCompact(vNum)}</td>`;
         }
         return `<td>${vNum === null ? "-" : vNum.toFixed(2)}</td>`;
       }
