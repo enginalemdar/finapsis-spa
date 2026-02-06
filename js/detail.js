@@ -1218,12 +1218,13 @@ const sorted = rows.slice().sort((a, b) => {
   const isMoneyMetric = (rawItem, normItem) => {
     if (moneyExact.has(normItem) || moneyContains.some(k => normItem.includes(k))) return true;
     const raw = String(rawItem || "").toLowerCase();
-    if (raw.includes("işletme sermayesi") || raw.includes("isletme sermayesi")) return true;
     if (raw.includes("working capital")) return true;
     if (raw.includes("net debt")) return true;
     if (raw.includes("book value")) return true;
     if (raw.includes("enterprise value")) return true;
     if (raw.includes("market cap")) return true;
+    // İşletme Sermayesi: devir/oran olmayanları para say
+    if (/isletme sermayesi(?!.*(devir|orani))/.test(normItem)) return true;
     return false;
   };
   const countItems = new Set([
