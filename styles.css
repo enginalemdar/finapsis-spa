@@ -2633,6 +2633,26 @@ tr.sec-row-level-3:hover td {
   overflow-y: visible;
 }
 
+#view-detail #financialTableWrap {
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+#view-detail .similar-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  object-fit: contain;
+  background: #0a0a0a;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+#view-detail .similar-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 #view-detail .card-head {
   padding: 12px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
